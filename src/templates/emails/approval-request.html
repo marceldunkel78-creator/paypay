@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approval Request</title>
+</head>
+<body>
+    <h1>Time Account Approval Request</h1>
+    <p>Dear Administrator,</p>
+    <p>A new time account request has been submitted by <strong>{{username}}</strong>.</p>
+    <p>Please review the request and take the necessary action.</p>
+    <p>Request Details:</p>
+    <ul>
+        <li>Requested Time: {{requestedTime}}</li>
+        <li>Reason: {{reason}}</li>
+    </ul>
+    <p>You can approve or reject the request by clicking the link below:</p>
+    <p><a href="{{approvalLink}}">Review Request</a></p>
+    <p>Thank you!</p>
+    <p>Best regards,<br>Your Time Account Management System</p>
+</body>
+</html>

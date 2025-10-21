@@ -1,0 +1,31 @@
+{
+  "name": "time-account-app",
+  "version": "1.0.0",
+  "description": "A dynamic web application for managing time accounts with user authentication and administrative approval.",
+  "main": "src/app.ts",
+  "scripts": {
+    "start": "ts-node src/server.ts",
+    "build": "tsc",
+    "migrate": "sh scripts/migrate.sh"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "mysql2": "^2.2.5",
+    "jsonwebtoken": "^8.5.1",
+    "bcrypt": "^5.0.1",
+    "nodemailer": "^6.4.11",
+    "dotenv": "^10.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.4.4",
+    "ts-node": "^10.4.0",
+    "eslint": "^7.32.0",
+    "eslint-config-airbnb-typescript": "^14.0.1",
+    "eslint-plugin-import": "^2.24.2",
+    "eslint-plugin-jsx-a11y": "^6.4.1",
+    "eslint-plugin-react": "^7.28.0",
+    "eslint-plugin-react-hooks": "^4.2.0"
+  },
+  "author": "Your Name",
+  "license": "MIT"
+}
