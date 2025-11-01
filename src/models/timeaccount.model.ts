@@ -1,8 +1,7 @@
 export interface TimeAccount {
-    id: number;
-    userId: number;
+    id?: number;
+    user_id: number;
     hours: number;
-    description: string;
-    createdAt: Date;
-    updatedAt: Date;
+    request_date?: Date;
+    status?: 'pending' | 'approved' | 'rejected';
 }

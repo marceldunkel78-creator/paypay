@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Account Management</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/timeentries.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Time Account Management System</h1>
+            <div id="userInfo" class="user-info" style="display: none;">
+                <span id="welcomeText"></span>
+                <button onclick="showChangePasswordModal()" class="btn btn-secondary">Passwort ändern</button>
+                <button onclick="logout()" class="btn btn-secondary">Logout</button>
+            </div>
+        </header>
+
+        <!-- Login/Register Section -->
+        <div id="authSection" class="auth-section">
+            <div class="auth-tabs">
+                <button onclick="showLogin()" class="tab-btn active" id="loginTab">Login</button>
+                <button onclick="showRegister()" class="tab-btn" id="registerTab">Registrieren</button>
+            </div>
+
+            <!-- Login Form -->
+            <div id="loginForm" class="auth-form">
+                <h2>Anmelden</h2>
+                <form onsubmit="login(event)">
+                    <div class="form-group">
+                        <label for="loginUsername">Benutzername:</label>
+                        <input type="text" id="loginUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Passwort:</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Anmelden</button>
+                </form>
+            </div>
+
+            <!-- Register Form -->
+            <div id="registerForm" class="auth-form" style="display: none;">
+                <h2>Registrieren</h2>
+                <form onsubmit="register(event)">
+                    <div class="form-group">
+                        <label for="registerUsername">Benutzername:</label>
+                        <input type="text" id="registerUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">Passwort:</label>
+                        <input type="password" id="registerPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Registrieren</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main Application -->
+        <div id="mainApp" class="main-app" style="display: none;">
+            
+            <!-- Current Balance Display -->
+            <section id="balanceSection" class="section balance-section">
+                <h2>💰 Aktueller Zeitkontostand</h2>
+                <div class="balance-display">
+                    <span class="balance-amount" id="currentBalance">0.00</span>
+                    <span class="balance-unit">Stunden</span>
+                </div>
+            </section>
+
+            <!-- New Time Entry Creation -->
+            <section id="timeEntrySection" class="section">
+                <h2>⏱️ Neue Zeiterfassung</h2>
+                <form onsubmit="createTimeEntry(event)" class="time-form">
+                    <div class="form-group">
+                        <label for="entryType">Art der Zeit:</label>
+                        <select id="entryType" required>
+                            <option value="productive">Produktive Zeit (+)</option>
+                            <option value="screen_time">Bildschirmzeit (-)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="timeHours">Stunden:</label>
+                        <input type="number" id="timeHours" step="0.25" min="0" max="24" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="timeDescription">Beschreibung (optional):</label>
+                        <input type="text" id="timeDescription" placeholder="Was haben Sie gemacht?">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Zeiteintrag hinzufügen</button>
+                </form>
+            </section>
+
+            <!-- Time Entries List -->
+            <section id="timeEntriesSection" class="section">
+                <h2>Meine Zeiteinträge (letzte 7 Tage)</h2>
+                <div id="timeEntriesList" class="time-entries-list">
+                    <!-- Time entries will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Legacy Time Account Creation (for compatibility) -->
+            <section class="section" style="display: none;">
+                <h2>Alte Zeiterfassung erstellen</h2>
+                <form onsubmit="createTimeAccount(event)" class="time-form">
+                    <div class="form-group">
+                        <label for="hours">Stunden:</label>
+                        <input type="number" id="hours" step="0.5" min="0" max="24" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Beschreibung (optional):</label>
+                        <input type="text" id="description" placeholder="Was haben Sie gearbeitet?">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Zeiterfassung erstellen</button>
+                </form>
+            </section>
+
+            <!-- Legacy Time Accounts List -->
+            <section class="section" style="display: none;">
+                <h2>Alte Zeiterfassungen</h2>
+                <button onclick="loadTimeAccounts()" class="btn btn-secondary">Aktualisieren</button>
+                <div id="timeAccountsList" class="time-accounts-list">
+                    <!-- Time accounts will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Admin Section (only for admins) -->
+            <div id="adminSection" class="admin-section" style="display: none;">
+                <h2>👨‍💼 Admin-Bereich</h2>
+                
+                <!-- User Statistics -->
+                <div class="admin-balance">
+                    <h3>📊 Benutzer-Statistiken (klickbar für Details)</h3>
+                    <div id="adminStatistics" class="admin-stats-container">
+                        <!-- Statistics will be loaded here -->
+                    </div>
+                </div>
+                
+                <!-- Pending Entries Section -->
+                <div class="admin-pending">
+                    <h3>⏳ Wartende Genehmigungen</h3>
+                    <div id="pendingEntriesList" class="pending-entries-container">
+                        <!-- Pending entries will be loaded here -->
+                    </div>
+                </div>
+                
+                <!-- Admin Actions -->
+                <div class="admin-actions">
+                    <h3>⚙️ Admin-Aktionen</h3>
+                    <button onclick="loadPendingEntries()" class="btn btn-secondary">
+                        � Wartende Einträge aktualisieren
+                    </button>
+                    <button onclick="loadAdminStatistics()" class="btn btn-secondary">
+                        � Statistiken aktualisieren
+                    </button>
+                    <button onclick="cleanupOldEntries()" class="btn btn-warning">
+                        🗑️ Alte Einträge bereinigen (>1 Woche)
+                    </button>
+                </div>
+
+                <!-- Legacy Admin Functions -->
+                <div class="legacy-admin" style="display: none;">
+                    <h3>Alte Admin-Funktionen</h3>
+                    <button onclick="loadPendingRequests()" class="btn btn-secondary">Wartende Anfragen laden</button>
+                    <div id="pendingRequestsList" class="pending-requests-list">
+                        <!-- Pending requests will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="messages" class="messages"></div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div id="changePasswordModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeChangePasswordModal()">&times;</span>
+            <h2>Passwort ändern</h2>
+            <form onsubmit="changePassword(event)">
+                <div class="form-group">
+                    <label for="currentPassword">Aktuelles Passwort:</label>
+                    <input type="password" id="currentPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">Neues Passwort:</label>
+                    <input type="password" id="newPassword" minlength="6" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Neues Passwort bestätigen:</label>
+                    <input type="password" id="confirmPassword" minlength="6" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Passwort ändern</button>
+                    <button type="button" onclick="closeChangePasswordModal()" class="btn btn-secondary">Abbrechen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

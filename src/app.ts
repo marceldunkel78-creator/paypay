@@ -1,9 +1,12 @@
 import express from 'express';
 import { json, urlencoded } from 'body-parser';
 import { connectToDatabase } from './db';
+import { migrateTimeEntries } from './db/migrate-timeentries';
+import { migrateApprovalSystem } from './db/migrate-approval';
 import authRoutes from './routes/auth.routes';
 import timeAccountRoutes from './routes/timeaccount.routes';
 import adminRoutes from './routes/admin.routes';
+import { TimeEntryRoutes } from './routes/timeentry.routes';
 import { passwordProtect } from './middlewares/password-protect.middleware';
 
 const app = express();
@@ -11,17 +14,55 @@ const app = express();
 // Middleware
 app.use(json());
 app.use(urlencoded({ extended: true }));
-app.use(passwordProtect);
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/timeaccounts', timeAccountRoutes);
-app.use('/api/admin', adminRoutes);
+// Serve static files from public directory
+app.use(express.static('public'));
 
-// Database connection
+// Public routes (no password protection)
+app.get('/', (req, res) => {
+    res.sendFile('index.html', { root: 'public' });
+});
+
+// API info endpoint  
+app.get('/api', (req, res) => {
+    res.json({
+        message: 'Time Account Management API',
+        version: '1.0.0',
+        endpoints: {
+            auth: '/api/auth (POST /register, POST /login)',
+            timeaccounts: '/api/timeaccounts (GET, POST /time-accounts)',
+            timeentries: '/api/timeentries (POST /, GET /, GET /balance, DELETE /:id)',
+            admin: '/api/admin (GET /requests, POST /approve/:id, POST /reject/:id)'
+        },
+        status: 'Server is running successfully'
+    });
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        database: 'Connected'
+    });
+});
+
+// Routes with different protection levels
+const timeEntryRoutes = new TimeEntryRoutes();
+
+app.use('/api/auth', authRoutes); // No password protection for auth
+app.use('/api/timeaccounts', passwordProtect, timeAccountRoutes);
+app.use('/api/timeentries', passwordProtect, timeEntryRoutes.router);
+app.use('/api/admin', passwordProtect, adminRoutes);
+
+// Database connection and migration
 connectToDatabase()
-  .then(() => {
+  .then(async () => {
     console.log('Database connected successfully');
+    // Run time entries migration
+    await migrateTimeEntries();
+    // Run approval system migration
+    await migrateApprovalSystem();
   })
   .catch((error) => {
     console.error('Database connection failed:', error);

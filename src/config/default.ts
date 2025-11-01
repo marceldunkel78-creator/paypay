@@ -11,7 +11,8 @@ export default {
   email: {
     service: process.env.EMAIL_SERVICE || 'gmail',
     user: process.env.EMAIL_USER || '',
-    password: process.env.EMAIL_PASSWORD || '',
+    password: process.env.EMAIL_PASS || '',
+    from: process.env.EMAIL_USER || '',
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'your_jwt_secret',

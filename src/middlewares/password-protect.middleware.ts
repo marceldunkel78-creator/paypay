@@ -9,3 +9,5 @@ export function passwordProtect(req: Request, res: Response, next: NextFunction)
         res.status(403).send('Forbidden: Incorrect password');
     }
 }
+
+export const passwordProtectMiddleware = passwordProtect;

@@ -1,0 +1,72 @@
+### Time Account Management API Tests
+
+# 1. Get API Info
+GET http://localhost:3000/
+
+###
+
+# 2. Health Check
+GET http://localhost:3000/health
+
+###
+
+# 3. Register a new user
+POST http://localhost:3000/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "testpassword"
+}
+
+###
+
+# 4. Login
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser", 
+  "password": "testpassword"
+}
+
+###
+
+# 5. Create Time Account (replace TOKEN_HERE with actual token from login)
+POST http://localhost:3000/api/timeaccounts/time-accounts
+Content-Type: application/json
+Authorization: Bearer TOKEN_HERE
+x-password: your_app_password
+
+{
+  "userId": 1,
+  "hours": 8.5
+}
+
+###
+
+# 6. Get all Time Accounts
+GET http://localhost:3000/api/timeaccounts/time-accounts
+Authorization: Bearer TOKEN_HERE
+x-password: your_app_password
+
+###
+
+# 7. Get Admin Requests
+GET http://localhost:3000/api/admin/requests
+Authorization: Bearer TOKEN_HERE
+x-password: your_app_password
+
+###
+
+# 8. Approve a request (replace 1 with actual request ID)
+POST http://localhost:3000/api/admin/approve/1
+Authorization: Bearer TOKEN_HERE
+x-password: your_app_password
+
+###
+
+# 9. Reject a request (replace 1 with actual request ID)  
+POST http://localhost:3000/api/admin/reject/1
+Authorization: Bearer TOKEN_HERE
+x-password: your_app_password

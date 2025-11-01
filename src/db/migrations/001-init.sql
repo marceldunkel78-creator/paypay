@@ -14,7 +14,7 @@ CREATE TABLE time_accounts (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-INSERT INTO users (username, password, role) VALUES
+/* INSERT INTO users (username, password, role) VALUES
 ('admin1', 'hashed_password1', 'admin'),
 ('admin2', 'hashed_password2', 'admin'),
-('user1', 'hashed_password3', 'user');
+('user1', 'hashed_password3', 'user'); */

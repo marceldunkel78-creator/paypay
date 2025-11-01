@@ -1,17 +1,15 @@
 import nodemailer from 'nodemailer';
-import { config } from '../config/default';
+import config from '../config/default';
 
 export class EmailService {
     private transporter;
 
     constructor() {
         this.transporter = nodemailer.createTransport({
-            host: config.email.host,
-            port: config.email.port,
-            secure: config.email.secure, // true for 465, false for other ports
+            service: config.email.service,
             auth: {
                 user: config.email.user,
-                pass: config.email.pass,
+                pass: config.email.password,
             },
         });
     }
@@ -27,7 +25,18 @@ export class EmailService {
         return this.transporter.sendMail(mailOptions);
     }
 
-    async sendApprovalConfirmation(to: string, subject: string, html: string) {
+    async sendApprovalConfirmation(to: string, subject: string = 'Request Approved', html: string = 'Your time account request has been approved.') {
+        const mailOptions = {
+            from: config.email.from,
+            to,
+            subject,
+            html,
+        };
+
+        return this.transporter.sendMail(mailOptions);
+    }
+
+    async sendRejectionNotification(to: string, subject: string = 'Request Rejected', html: string = 'Your time account request has been rejected.') {
         const mailOptions = {
             from: config.email.from,
             to,

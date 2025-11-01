@@ -10,22 +10,11 @@ export class TimeAccountController {
 
     public async createTimeAccount(req: Request, res: Response): Promise<void> {
         try {
-            const timeAccountData = req.body;
-            const newTimeAccount = await this.timeAccountService.createTimeAccount(timeAccountData);
+            const { userId, hours } = req.body;
+            const newTimeAccount = await this.timeAccountService.createTimeAccount(parseInt(userId), parseFloat(hours));
             res.status(201).json(newTimeAccount);
         } catch (error) {
             res.status(500).json({ message: 'Error creating time account', error });
-        }
-    }
-
-    public async updateTimeAccount(req: Request, res: Response): Promise<void> {
-        try {
-            const { id } = req.params;
-            const timeAccountData = req.body;
-            const updatedTimeAccount = await this.timeAccountService.updateTimeAccount(id, timeAccountData);
-            res.status(200).json(updatedTimeAccount);
-        } catch (error) {
-            res.status(500).json({ message: 'Error updating time account', error });
         }
     }
 
@@ -41,7 +30,7 @@ export class TimeAccountController {
     public async getTimeAccountById(req: Request, res: Response): Promise<void> {
         try {
             const { id } = req.params;
-            const timeAccount = await this.timeAccountService.getTimeAccountById(id);
+            const timeAccount = await this.timeAccountService.getTimeAccountById(parseInt(id));
             if (timeAccount) {
                 res.status(200).json(timeAccount);
             } else {
@@ -49,6 +38,29 @@ export class TimeAccountController {
             }
         } catch (error) {
             res.status(500).json({ message: 'Error retrieving time account', error });
+        }
+    }
+
+    public async deleteTimeAccount(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const deleted = await this.timeAccountService.deleteTimeAccount(parseInt(id));
+            if (deleted) {
+                res.status(200).json({ message: 'Time account deleted successfully' });
+            } else {
+                res.status(404).json({ message: 'Time account not found' });
+            }
+        } catch (error) {
+            res.status(500).json({ message: 'Error deleting time account', error });
+        }
+    }
+
+    public async getAllTimeAccounts(req: Request, res: Response): Promise<void> {
+        try {
+            const timeAccounts = await this.timeAccountService.getTimeAccounts();
+            res.status(200).json(timeAccounts);
+        } catch (error) {
+            res.status(500).json({ message: 'Error retrieving time accounts', error });
         }
     }
 }
