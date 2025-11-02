@@ -1,14 +1,15 @@
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const readline = require('readline');
+require('dotenv').config();
 
-// Database configuration (same as in the main app)
+// Database configuration using environment variables
 const dbConfig = {
-    host: 'localhost',
-    port: 3306,
-    user: 'Marcel',
-    password: 'A4wyGKu3C8JBmnamDKm8',
-    database: 'time_account_db'
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT) || 3306,
+    user: process.env.DB_USER || 'paypay',
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME || 'time_account_db'
 };
 
 // Create readline interface for user input
