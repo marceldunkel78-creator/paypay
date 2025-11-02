@@ -22,6 +22,7 @@ class TimeEntryService {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
                 let finalHours = timeEntry.hours;
+                let taskName;
                 // Wenn task_id gegeben ist, Stunden aus Hausarbeiten-Tabelle laden
                 if (timeEntry.task_id) {
                     const task = yield this.householdTaskService.getHouseholdTaskById(timeEntry.task_id);
@@ -31,6 +32,7 @@ class TimeEntryService {
                     if (!task.is_active) {
                         throw new Error('Hausarbeit ist nicht aktiv');
                     }
+                    taskName = task.name; // Task-Name für die E-Mail speichern
                     // Positive oder negative Stunden basierend auf entry_type
                     finalHours = timeEntry.entry_type === 'screen_time' ? -Math.abs(task.hours) : Math.abs(task.hours);
                 }
@@ -54,7 +56,7 @@ class TimeEntryService {
                 console.log('Time entry created (pending approval):', result.insertId);
                 // NICHT die Balance aktualisieren - erst bei Genehmigung!
                 // Neu erstellten Eintrag zurückgeben
-                return Object.assign(Object.assign({ id: result.insertId }, timeEntry), { hours: finalHours, status: 'pending', created_at: new Date() });
+                return Object.assign(Object.assign({ id: result.insertId }, timeEntry), { hours: finalHours, status: 'pending', created_at: new Date(), task_name: taskName });
             }
             catch (error) {
                 console.error('Error creating time entry:', error);
@@ -278,7 +280,7 @@ class TimeEntryService {
                 const db = yield (0, db_1.connectToDatabase)();
                 // Zuerst den Eintrag abrufen um die Stunden und Benutzer-E-Mail zu bekommen
                 const selectQuery = `
-                SELECT te.user_id, te.hours, u.username as userEmail 
+                SELECT te.user_id, te.hours, u.email as userEmail 
                 FROM time_entries te 
                 JOIN users u ON te.user_id = u.id
                 WHERE te.id = ? AND te.status = 'pending'

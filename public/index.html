@@ -184,9 +184,36 @@
                     <button onclick="showHouseholdTasksManagement()" class="btn btn-primary">
                         🏠 Hausarbeiten verwalten
                     </button>
+                    <button onclick="showUserManagement()" class="btn btn-primary">
+                        👥 Benutzer verwalten
+                    </button>
                     <button onclick="cleanupOldEntries()" class="btn btn-warning">
                         🗑️ Alte Einträge bereinigen (>1 Woche)
                     </button>
+                </div>
+
+                <!-- User Management -->
+                <div id="userManagement" class="admin-user-management" style="display: none;">
+                    <div class="section-header">
+                        <h3>👥 Benutzer-Verwaltung</h3>
+                        <button onclick="hideUserManagement()" class="btn btn-secondary">← Zurück zum Admin-Bereich</button>
+                    </div>
+                    
+                    <!-- Pending Registrations -->
+                    <div class="pending-registrations">
+                        <h4>📝 Wartende Registrierungen</h4>
+                        <div id="pendingUsers" class="pending-users-list">
+                            <!-- Pending users will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <!-- All Users -->
+                    <div class="all-users">
+                        <h4>👥 Alle Benutzer</h4>
+                        <div id="allUsers" class="all-users-list">
+                            <!-- All users will be loaded here -->
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Household Tasks Management -->

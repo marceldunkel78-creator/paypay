@@ -6,13 +6,17 @@ import { passwordProtectMiddleware } from '../middlewares/password-protect.middl
 const router = Router();
 const adminController = new AdminController();
 
-// Route to approve a time account request
+// Time Account Management Routes
 router.post('/approve/:requestId', authMiddleware, passwordProtectMiddleware, (req, res) => adminController.approveRequest(req, res));
-
-// Route to reject a time account request
 router.post('/reject/:requestId', authMiddleware, passwordProtectMiddleware, (req, res) => adminController.rejectRequest(req, res));
-
-// Route to get all pending requests
 router.get('/requests', authMiddleware, passwordProtectMiddleware, (req, res) => adminController.getPendingRequests(req, res));
+
+// User Management Routes
+router.get('/users', authMiddleware, passwordProtectMiddleware, (req, res) => adminController.getAllUsers(req, res));
+router.get('/users/pending', authMiddleware, passwordProtectMiddleware, (req, res) => adminController.getPendingUsers(req, res));
+router.post('/users/:userId/approve', authMiddleware, passwordProtectMiddleware, (req, res) => adminController.approveUser(req, res));
+router.post('/users/:userId/activate', authMiddleware, passwordProtectMiddleware, (req, res) => adminController.activateUser(req, res));
+router.post('/users/:userId/suspend', authMiddleware, passwordProtectMiddleware, (req, res) => adminController.suspendUser(req, res));
+router.delete('/users/:userId', authMiddleware, passwordProtectMiddleware, (req, res) => adminController.deleteUser(req, res));
 
 export default router;

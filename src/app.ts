@@ -6,6 +6,8 @@ import { migrateApprovalSystem } from './db/migrate-approval';
 import { migrateHouseholdTasks } from './db/migrate-household-tasks';
 import { migrateTimeEntriesTaskId } from './db/migrate-timeentries-task-id';
 import { migrateUserEmail } from './db/migrate-user-email';
+import { migrateUserStatus } from './db/migrate-user-status';
+import { removeDefaultUsers } from './db/migrate-remove-default-users';
 import authRoutes from './routes/auth.routes';
 import timeAccountRoutes from './routes/timeaccount.routes';
 import adminRoutes from './routes/admin.routes';
@@ -85,6 +87,10 @@ connectToDatabase()
     await migrateTimeEntriesTaskId();
     // Run user email migration
     await migrateUserEmail();
+    // Run user status migration
+    await migrateUserStatus();
+    // Remove default test users
+    await removeDefaultUsers();
   })
   .catch((error) => {
     console.error('Database connection failed:', error);

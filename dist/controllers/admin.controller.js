@@ -12,10 +12,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminController = void 0;
 const timeaccount_service_1 = require("../services/timeaccount.service");
 const email_service_1 = require("../services/email.service");
+const auth_service_1 = require("../services/auth.service");
 class AdminController {
     constructor() {
         this.timeAccountService = new timeaccount_service_1.TimeAccountService();
         this.emailService = new email_service_1.EmailService();
+        this.authService = new auth_service_1.AuthService();
     }
     approveRequest(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -88,6 +90,85 @@ class AdminController {
             }
             catch (error) {
                 res.status(500).json({ message: 'Error retrieving pending requests', error });
+            }
+        });
+    }
+    // User Management Methods
+    getAllUsers(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const users = yield this.authService.getAllUsers();
+                res.status(200).json(users);
+            }
+            catch (error) {
+                console.error('Error fetching all users:', error);
+                res.status(500).json({ message: 'Error retrieving users', error });
+            }
+        });
+    }
+    getPendingUsers(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const pendingUsers = yield this.authService.getPendingUsers();
+                res.status(200).json(pendingUsers);
+            }
+            catch (error) {
+                console.error('Error fetching pending users:', error);
+                res.status(500).json({ message: 'Error retrieving pending users', error });
+            }
+        });
+    }
+    approveUser(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const { userId } = req.params;
+            try {
+                const success = yield this.authService.approveUser(parseInt(userId));
+                if (success) {
+                    res.status(200).json({ message: 'User approved successfully' });
+                }
+                else {
+                    res.status(404).json({ message: 'User not found or not pending' });
+                }
+            }
+            catch (error) {
+                console.error('Error approving user:', error);
+                res.status(500).json({ message: 'Error approving user', error });
+            }
+        });
+    }
+    suspendUser(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const { userId } = req.params;
+            try {
+                const success = yield this.authService.suspendUser(parseInt(userId));
+                if (success) {
+                    res.status(200).json({ message: 'User suspended successfully' });
+                }
+                else {
+                    res.status(404).json({ message: 'User not found' });
+                }
+            }
+            catch (error) {
+                console.error('Error suspending user:', error);
+                res.status(500).json({ message: 'Error suspending user', error });
+            }
+        });
+    }
+    deleteUser(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const { userId } = req.params;
+            try {
+                const success = yield this.authService.deleteUser(parseInt(userId));
+                if (success) {
+                    res.status(200).json({ message: 'User and all associated data deleted successfully' });
+                }
+                else {
+                    res.status(404).json({ message: 'User not found' });
+                }
+            }
+            catch (error) {
+                console.error('Error deleting user:', error);
+                res.status(500).json({ message: 'Error deleting user', error });
             }
         });
     }

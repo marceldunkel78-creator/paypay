@@ -16,7 +16,11 @@ exports.AuthService = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const index_1 = require("../db/index");
+const email_service_1 = require("./email.service");
 class AuthService {
+    constructor() {
+        this.emailService = new email_service_1.EmailService();
+    }
     register(username, email, password) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
@@ -33,15 +37,20 @@ class AuthService {
                 }
                 const hashedPassword = yield bcrypt_1.default.hash(password, 10);
                 const connection = yield (0, index_1.connectToDatabase)();
-                const [result] = yield connection.execute('INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)', [username, email, hashedPassword, 'user']);
+                // New users start as 'pending' and need admin approval
+                const [result] = yield connection.execute('INSERT INTO users (username, email, password, role, status) VALUES (?, ?, ?, ?, ?)', [username, email, hashedPassword, 'user', 'pending']);
                 const insertResult = result;
-                console.log('User inserted with ID:', insertResult.insertId);
+                console.log('User inserted with ID:', insertResult.insertId, '(status: pending)');
+                // Send email notification to admins about new registration (async, don't wait)
+                this.emailService.sendNewUserRegistrationNotification(username, email)
+                    .catch(error => console.warn('Failed to send new user registration notification:', error));
                 return {
                     id: insertResult.insertId,
                     username,
                     email,
                     password: hashedPassword,
-                    role: 'user'
+                    role: 'user',
+                    status: 'pending'
                 };
             }
             catch (error) {
@@ -53,7 +62,7 @@ class AuthService {
     login(username, password) {
         return __awaiter(this, void 0, void 0, function* () {
             const connection = yield (0, index_1.connectToDatabase)();
-            const [rows] = yield connection.execute('SELECT * FROM users WHERE username = ?', [username]);
+            const [rows] = yield connection.execute('SELECT * FROM users WHERE username = ? AND status = ?', [username, 'active']);
             const users = rows;
             const user = users[0];
             if (user && (yield bcrypt_1.default.compare(password, user.password))) {
@@ -130,6 +139,119 @@ class AuthService {
             catch (error) {
                 console.error('Error fetching user by email:', error);
                 return null;
+            }
+        });
+    }
+    // Admin-only methods for user management
+    getPendingUsers() {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const connection = yield (0, index_1.connectToDatabase)();
+                const [rows] = yield connection.execute('SELECT id, username, email, role, status FROM users WHERE status = ? ORDER BY id DESC', ['pending']);
+                return rows;
+            }
+            catch (error) {
+                console.error('Error fetching pending users:', error);
+                throw error;
+            }
+        });
+    }
+    getAllUsers() {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const connection = yield (0, index_1.connectToDatabase)();
+                const [rows] = yield connection.execute('SELECT id, username, email, role, status FROM users ORDER BY id DESC');
+                return rows;
+            }
+            catch (error) {
+                console.error('Error fetching all users:', error);
+                throw error;
+            }
+        });
+    }
+    approveUser(userId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const connection = yield (0, index_1.connectToDatabase)();
+                // First get user details for email notification
+                const [userRows] = yield connection.execute('SELECT username, email FROM users WHERE id = ? AND status = ?', [userId, 'pending']);
+                const users = userRows;
+                if (users.length === 0) {
+                    return false; // User not found or not pending
+                }
+                const user = users[0];
+                // Update user status to active
+                const [result] = yield connection.execute('UPDATE users SET status = ? WHERE id = ? AND status = ?', ['active', userId, 'pending']);
+                const updateResult = result;
+                const success = updateResult.affectedRows > 0;
+                // Send approval confirmation email (async, don't wait)
+                if (success) {
+                    this.emailService.sendUserApprovalConfirmation(user.email, user.username)
+                        .then(() => console.log(`User approval confirmation sent to ${user.email}`))
+                        .catch(error => console.warn('Failed to send user approval confirmation:', error));
+                }
+                return success;
+            }
+            catch (error) {
+                console.error('Error approving user:', error);
+                throw error;
+            }
+        });
+    }
+    suspendUser(userId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const connection = yield (0, index_1.connectToDatabase)();
+                const [result] = yield connection.execute('UPDATE users SET status = ? WHERE id = ?', ['suspended', userId]);
+                const updateResult = result;
+                return updateResult.affectedRows > 0;
+            }
+            catch (error) {
+                console.error('Error suspending user:', error);
+                throw error;
+            }
+        });
+    }
+    deleteUser(userId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const connection = yield (0, index_1.connectToDatabase)();
+                // First get user details for potential email notification
+                const [userRows] = yield connection.execute('SELECT username, email, status FROM users WHERE id = ?', [userId]);
+                const users = userRows;
+                if (users.length === 0) {
+                    return false; // User not found
+                }
+                const user = users[0];
+                const wasPending = user.status === 'pending';
+                // Start transaction using query() instead of execute()
+                yield connection.query('START TRANSACTION');
+                try {
+                    // First, delete all time entries for this user
+                    yield connection.execute('DELETE FROM time_entries WHERE user_id = ?', [userId]);
+                    // Then delete the user
+                    const [result] = yield connection.execute('DELETE FROM users WHERE id = ?', [userId]);
+                    // Commit transaction
+                    yield connection.query('COMMIT');
+                    const deleteResult = result;
+                    const success = deleteResult.affectedRows > 0;
+                    // Send rejection email if user was pending (async, don't wait)
+                    if (success && wasPending) {
+                        this.emailService.sendUserRejectionNotification(user.email, user.username)
+                            .then(() => console.log(`User rejection notification sent to ${user.email}`))
+                            .catch(error => console.warn('Failed to send user rejection notification:', error));
+                    }
+                    return success;
+                }
+                catch (error) {
+                    // Rollback on error
+                    yield connection.query('ROLLBACK');
+                    throw error;
+                }
+            }
+            catch (error) {
+                console.error('Error deleting user:', error);
+                throw error;
             }
         });
     }

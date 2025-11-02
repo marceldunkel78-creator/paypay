@@ -510,3 +510,107 @@ header h1 {
     color: #666;
     font-style: italic;
 }
+
+/* User Management Styles */
+.admin-user-management {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.pending-users-list, .all-users-list {
+    display: grid;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.pending-user-card, .user-card {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pending-user-card {
+    border-left-color: #fbbf24;
+}
+
+.user-card.active {
+    border-left-color: #10b981;
+}
+
+.user-card.pending {
+    border-left-color: #fbbf24;
+}
+
+.user-card.suspended {
+    border-left-color: #ef4444;
+}
+
+.user-info {
+    flex: 1;
+}
+
+.user-info strong {
+    font-size: 1.1em;
+    color: #1f2937;
+}
+
+.user-role {
+    font-size: 0.8em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+}
+
+.user-role.admin {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.user-role.user {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.user-status {
+    font-weight: 600;
+}
+
+.user-status.active {
+    color: #10b981;
+}
+
+.user-status.pending {
+    color: #fbbf24;
+}
+
+.user-status.suspended {
+    color: #ef4444;
+}
+
+.user-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.875em;
+}
+
+.no-data {
+    text-align: center;
+    color: #6b7280;
+    font-style: italic;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    margin-top: 15px;
+}

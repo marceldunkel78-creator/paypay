@@ -206,21 +206,12 @@ class TimeEntryController {
                 }
                 const result = yield this.timeEntryService.approveTimeEntry(parseInt(id), user.id);
                 if (result.success) {
-                    // Map user emails - replace with actual user email addresses
-                    const userEmailMap = {
-                        'mdjunk6': 'mdjunk6@freenet.de',
-                        'admin1': 'marceldunkel78@gmail.com',
-                        'admin2': 'marceldunkel78@gmail.com',
-                        // Add more users as needed
-                    };
-                    // Get the actual email address
-                    const actualEmail = userEmailMap[result.userEmail || ''] || result.userEmail;
                     // Send email notification if email is configured and user email available
-                    if (actualEmail && actualEmail.includes('@')) {
+                    if (result.userEmail && result.userEmail.includes('@')) {
                         try {
                             if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-                                yield this.emailService.sendApprovalConfirmation(actualEmail, 'Zeiteintrag genehmigt', '<h1>✅ Zeiteintrag genehmigt!</h1><p>Ihr Zeiteintrag wurde von einem Administrator genehmigt.</p>');
-                                console.log(`Approval notification sent to ${actualEmail}`);
+                                yield this.emailService.sendApprovalConfirmation(result.userEmail, 'Zeiteintrag genehmigt', '<h1>✅ Zeiteintrag genehmigt!</h1><p>Ihr Zeiteintrag wurde von einem Administrator genehmigt.</p>');
+                                console.log(`Approval notification sent to ${result.userEmail}`);
                             }
                             else {
                                 console.log('Email not configured - skipping notification');
@@ -365,6 +356,11 @@ class TimeEntryController {
                 const userDetails = yield this.timeEntryService.getUserById(timeEntry.user_id);
                 const userName = (userDetails === null || userDetails === void 0 ? void 0 : userDetails.username) || 'Unbekannter Benutzer';
                 const userEmail = (userDetails === null || userDetails === void 0 ? void 0 : userDetails.email) || 'Keine E-Mail';
+                // Build task information for productive time
+                let taskInfo = '';
+                if (timeEntry.entry_type === 'productive' && timeEntry.task_name) {
+                    taskInfo = `<p><strong>Hausarbeit:</strong> ${timeEntry.task_name}</p>`;
+                }
                 const subject = `Neue Zeiterfassung zur Genehmigung - ${userName}`;
                 const html = `
                 <h2>🕒 Neue Zeiterfassung wartet auf Genehmigung</h2>
@@ -372,6 +368,7 @@ class TimeEntryController {
                     <p><strong>Benutzer:</strong> ${userName} (${userEmail})</p>
                     <p><strong>Stunden:</strong> ${timeEntry.hours} Stunden</p>
                     <p><strong>Typ:</strong> ${timeEntry.entry_type === 'productive' ? 'Produktive Zeit' : 'Bildschirmzeit'}</p>
+                    ${taskInfo}
                     <p><strong>Beschreibung:</strong> ${timeEntry.description || 'Keine Beschreibung'}</p>
                     <p><strong>Erstellt am:</strong> ${new Date().toLocaleString('de-DE')}</p>
                 </div>
@@ -380,12 +377,14 @@ class TimeEntryController {
             `;
                 // Send to all admin emails
                 for (const adminEmail of adminEmails) {
-                    try {
-                        yield this.emailService.sendApprovalRequest(adminEmail, subject, html);
-                        console.log(`Admin notification sent to ${adminEmail}`);
-                    }
-                    catch (emailError) {
-                        console.warn(`Failed to send notification to ${adminEmail}:`, emailError);
+                    if (adminEmail) { // Type guard to ensure adminEmail is not undefined
+                        try {
+                            yield this.emailService.sendApprovalRequest(adminEmail, subject, html);
+                            console.log(`Admin notification sent to ${adminEmail}`);
+                        }
+                        catch (emailError) {
+                            console.warn(`Failed to send notification to ${adminEmail}:`, emailError);
+                        }
                     }
                 }
             }
@@ -396,8 +395,3 @@ class TimeEntryController {
     }
 }
 exports.TimeEntryController = TimeEntryController;
-try { }
-catch (error) {
-    console.error('Error deleting time entry (admin):', error);
-    res.status(500).json({ error: 'Fehler beim Löschen des Zeiteintrags' });
-}

@@ -45,7 +45,7 @@ async function register(event) {
         const data = await response.json();
         
         if (response.ok) {
-            showMessage('Registrierung erfolgreich! Sie können sich jetzt anmelden.', 'success');
+            showMessage('Registrierung erfolgreich! Ihre Registrierung wartet auf Admin-Genehmigung. Sie erhalten eine Benachrichtigung, sobald Ihr Account freigeschaltet wurde.', 'success');
             showLogin();
             // Reset the form properly
             document.getElementById('registerUsername').value = '';
@@ -1523,5 +1523,223 @@ async function deleteHouseholdTask(taskId) {
     } catch (error) {
         console.error('Error deleting household task:', error);
         showMessage('Fehler beim Löschen der Hausarbeit', 'error');
+    }
+}
+
+// User Management Functions
+function showUserManagement() {
+    document.getElementById('userManagement').style.display = 'block';
+    loadPendingUsers();
+    loadAllUsers();
+}
+
+function hideUserManagement() {
+    document.getElementById('userManagement').style.display = 'none';
+}
+
+async function loadPendingUsers() {
+    try {
+        const response = await fetch(`${API_BASE}/admin/users/pending`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayPendingUsers(data);
+        } else {
+            console.error('Failed to load pending users');
+        }
+    } catch (error) {
+        console.error('Error loading pending users:', error);
+    }
+}
+
+async function loadAllUsers() {
+    try {
+        const response = await fetch(`${API_BASE}/admin/users`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayAllUsers(data);
+        } else {
+            console.error('Failed to load all users');
+        }
+    } catch (error) {
+        console.error('Error loading all users:', error);
+    }
+}
+
+function displayPendingUsers(users) {
+    const container = document.getElementById('pendingUsers');
+    
+    if (users.length === 0) {
+        container.innerHTML = '<p class="no-data">Keine wartenden Registrierungen</p>';
+        return;
+    }
+    
+    container.innerHTML = users.map(user => `
+        <div class="pending-user-card">
+            <div class="user-info">
+                <strong>${user.username}</strong><br>
+                <small>${user.email}</small><br>
+                <small>Benutzer-ID: ${user.id}</small>
+            </div>
+            <div class="user-actions">
+                <button onclick="approveUser(${user.id})" class="btn btn-success btn-sm">✅ Genehmigen</button>
+                <button onclick="deleteUser(${user.id}, '${user.username}')" class="btn btn-danger btn-sm">❌ Ablehnen</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function displayAllUsers(users) {
+    const container = document.getElementById('allUsers');
+    
+    if (users.length === 0) {
+        container.innerHTML = '<p class="no-data">Keine Benutzer gefunden</p>';
+        return;
+    }
+    
+    container.innerHTML = users.map(user => `
+        <div class="user-card ${user.status}">
+            <div class="user-info">
+                <strong>${user.username}</strong>
+                <span class="user-role ${user.role}">${user.role === 'admin' ? '👨‍💼 Admin' : '👤 Benutzer'}</span><br>
+                <small>${user.email}</small><br>
+                <small>Status: <span class="user-status ${user.status}">${getStatusLabel(user.status)}</span></small><br>
+                <small>Benutzer-ID: ${user.id}</small>
+            </div>
+            <div class="user-actions">
+                ${user.status === 'active' ? `
+                    <button onclick="suspendUser(${user.id}, '${user.username}')" class="btn btn-warning btn-sm">⏸️ Sperren</button>
+                ` : user.status === 'suspended' ? `
+                    <button onclick="activateUser(${user.id})" class="btn btn-success btn-sm">✅ Aktivieren</button>
+                ` : user.status === 'pending' ? `
+                    <button onclick="approveUser(${user.id})" class="btn btn-success btn-sm">✅ Genehmigen</button>
+                ` : ''}
+                ${user.role !== 'admin' ? `
+                    <button onclick="deleteUser(${user.id}, '${user.username}')" class="btn btn-danger btn-sm">🗑️ Löschen</button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function getStatusLabel(status) {
+    switch(status) {
+        case 'active': return '✅ Aktiv';
+        case 'pending': return '⏳ Wartend';
+        case 'suspended': return '⏸️ Gesperrt';
+        default: return status;
+    }
+}
+
+async function approveUser(userId) {
+    try {
+        const response = await fetch(`${API_BASE}/admin/users/${userId}/approve`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showMessage('Benutzer erfolgreich genehmigt!', 'success');
+            loadPendingUsers();
+            loadAllUsers();
+        } else {
+            showMessage(data.message || 'Fehler beim Genehmigen des Benutzers', 'error');
+        }
+    } catch (error) {
+        console.error('Error approving user:', error);
+        showMessage('Fehler beim Genehmigen des Benutzers', 'error');
+    }
+}
+
+async function activateUser(userId) {
+    try {
+        const response = await fetch(`${API_BASE}/admin/users/${userId}/activate`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showMessage('Benutzer erfolgreich aktiviert!', 'success');
+            loadAllUsers();
+        } else {
+            showMessage(data.message || 'Fehler beim Aktivieren des Benutzers', 'error');
+        }
+    } catch (error) {
+        console.error('Error activating user:', error);
+        showMessage('Fehler beim Aktivieren des Benutzers', 'error');
+    }
+}
+
+async function suspendUser(userId, username) {
+    if (!confirm(`Möchten Sie den Benutzer "${username}" wirklich sperren?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/admin/users/${userId}/suspend`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showMessage('Benutzer erfolgreich gesperrt!', 'success');
+            loadAllUsers();
+        } else {
+            showMessage(data.message || 'Fehler beim Sperren des Benutzers', 'error');
+        }
+    } catch (error) {
+        console.error('Error suspending user:', error);
+        showMessage('Fehler beim Sperren des Benutzers', 'error');
+    }
+}
+
+async function deleteUser(userId, username) {
+    if (!confirm(`ACHTUNG: Möchten Sie den Benutzer "${username}" und ALLE seine Daten wirklich PERMANENT löschen? Diese Aktion kann nicht rückgängig gemacht werden!`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/admin/users/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showMessage('Benutzer und alle zugehörigen Daten erfolgreich gelöscht!', 'success');
+            loadPendingUsers();
+            loadAllUsers();
+        } else {
+            showMessage(data.message || 'Fehler beim Löschen des Benutzers', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        showMessage('Fehler beim Löschen des Benutzers', 'error');
     }
 }

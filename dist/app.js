@@ -20,6 +20,8 @@ const migrate_approval_1 = require("./db/migrate-approval");
 const migrate_household_tasks_1 = require("./db/migrate-household-tasks");
 const migrate_timeentries_task_id_1 = require("./db/migrate-timeentries-task-id");
 const migrate_user_email_1 = require("./db/migrate-user-email");
+const migrate_user_status_1 = require("./db/migrate-user-status");
+const migrate_remove_default_users_1 = require("./db/migrate-remove-default-users");
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const timeaccount_routes_1 = __importDefault(require("./routes/timeaccount.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
@@ -89,6 +91,10 @@ app.use('/api/admin', password_protect_middleware_1.passwordProtect, admin_route
     yield (0, migrate_timeentries_task_id_1.migrateTimeEntriesTaskId)();
     // Run user email migration
     yield (0, migrate_user_email_1.migrateUserEmail)();
+    // Run user status migration
+    yield (0, migrate_user_status_1.migrateUserStatus)();
+    // Remove default test users
+    yield (0, migrate_remove_default_users_1.removeDefaultUsers)();
 }))
     .catch((error) => {
     console.error('Database connection failed:', error);
