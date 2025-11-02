@@ -1,30 +1,62 @@
-# Ignore development files
+# Dependencies
 node_modules/
-.env
-.env.local
-.env.development
-.env.test
+npm-debug.log*
 
-# Ignore build outputs
+# Build output
 dist/
 build/
 
-# Ignore logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
 
-# Ignore IDE files
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Version control
+.git/
+.gitignore
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Ignore OS files
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Ignore temporary files
-*.tmp
-*.temp
+# Backup files
+backups/
+*.backup
+*.bak
+
+# Temporary files
+tmp/
+temp/
+
+# Documentation (optional, include if you want)
+*.md
+!README.md
+
+# Scripts (include only deployment scripts)
+scripts/migrate.ps1
+scripts/migrate.sh
+
+# Docker files (avoid inception)
+Dockerfile
+docker-compose.yml
+.dockerignore

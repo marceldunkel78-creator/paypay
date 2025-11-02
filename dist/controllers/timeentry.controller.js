@@ -20,7 +20,7 @@ class TimeEntryController {
         var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { task_id, entry_type, description } = req.body;
+                const { task_id, entry_type, description, hours } = req.body;
                 const user_id = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
                 const user_role = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
                 if (!user_id) {
@@ -32,18 +32,34 @@ class TimeEntryController {
                     res.status(403).json({ error: 'Admins können keine Zeiteinträge erstellen' });
                     return;
                 }
-                if (!task_id || !entry_type) {
-                    res.status(400).json({ error: 'Hausarbeit und Eintragstyp sind erforderlich' });
+                if (!entry_type) {
+                    res.status(400).json({ error: 'Eintragstyp ist erforderlich' });
                     return;
                 }
                 if (!['productive', 'screen_time'].includes(entry_type)) {
                     res.status(400).json({ error: 'Ungültiger Eintragstyp' });
                     return;
                 }
+                // Validation: Either task_id or manual hours must be provided
+                if (!task_id && !hours) {
+                    res.status(400).json({ error: 'Entweder Hausarbeit oder manuelle Stundeneingabe ist erforderlich' });
+                    return;
+                }
+                // Validation: If hours provided, it must be for screen_time and negative
+                if (hours !== undefined) {
+                    if (entry_type !== 'screen_time') {
+                        res.status(400).json({ error: 'Manuelle Stundeneingabe nur für Bildschirmzeit erlaubt' });
+                        return;
+                    }
+                    if (typeof hours !== 'number' || hours >= 0) {
+                        res.status(400).json({ error: 'Bildschirmzeit muss als negative Zahl angegeben werden' });
+                        return;
+                    }
+                }
                 const timeEntry = {
                     user_id,
-                    task_id: parseInt(task_id),
-                    hours: 0,
+                    task_id: task_id ? parseInt(task_id) : undefined,
+                    hours: hours || 0,
                     entry_type,
                     description: description || '',
                     status: 'pending'

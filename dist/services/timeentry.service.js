@@ -34,6 +34,18 @@ class TimeEntryService {
                     // Positive oder negative Stunden basierend auf entry_type
                     finalHours = timeEntry.entry_type === 'screen_time' ? -Math.abs(task.hours) : Math.abs(task.hours);
                 }
+                else {
+                    // Für manuelle Eingaben: Stunden direkt verwenden (sollten bereits korrekt sein)
+                    finalHours = timeEntry.hours;
+                    // Validierung: Manuelle Eingaben sind nur für screen_time erlaubt
+                    if (timeEntry.entry_type !== 'screen_time') {
+                        throw new Error('Manuelle Stundeneingabe nur für Bildschirmzeit erlaubt');
+                    }
+                    // Sicherstellen, dass manuelle screen_time negative Werte hat
+                    if (finalHours >= 0) {
+                        throw new Error('Bildschirmzeit muss negativ sein');
+                    }
+                }
                 const query = `
                 INSERT INTO time_entries (user_id, task_id, hours, entry_type, description, status)
                 VALUES (?, ?, ?, ?, ?, 'pending')

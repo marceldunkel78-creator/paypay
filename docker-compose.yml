@@ -1,30 +1,102 @@
+# ==============================================
+# Docker Compose for Raspberry Pi Deployment
+# Production-ready setup with MySQL and reverse proxy
+# ==============================================
+
 version: '3.8'
 
 services:
+  # Time Account Management Application
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+      platforms:
+        - linux/arm64  # For Raspberry Pi 4
+        - linux/arm/v7 # For older Raspberry Pi
+    container_name: time-account-app
+    restart: unless-stopped
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=mysql://user:password@db:3306/time_account_db
+      - PORT=3000
+      - DATABASE_URL=mysql://timeaccount:${DB_PASSWORD}@mysql:3306/time_account_db
+      - JWT_SECRET=${JWT_SECRET}
+      - EMAIL_SERVICE=${EMAIL_SERVICE}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - ADMIN_EMAIL_1=${ADMIN_EMAIL_1}
+      - ADMIN_EMAIL_2=${ADMIN_EMAIL_2}
     depends_on:
-      - db
-
-  db:
-    image: mysql:5.7
-    restart: always
-    environment:
-      MYSQL_DATABASE: time_account_db
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-      MYSQL_ROOT_PASSWORD: root_password
-    ports:
-      - "3306:3306"
+      mysql:
+        condition: service_healthy
+    networks:
+      - app-network
     volumes:
-      - db_data:/var/lib/mysql
+      - app-logs:/app/logs
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: time-account-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=time_account_db
+      - MYSQL_USER=timeaccount
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+    ports:
+      - "3306:3306"  # Remove this in production for security
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Nginx Reverse Proxy (for SSL and domain handling)
+  nginx:
+    image: nginx:alpine
+    container_name: time-account-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - web-root:/var/www/html
+    depends_on:
+      - app
+    networks:
+      - app-network
+
+  # Certbot for SSL certificates
+  certbot:
+    image: certbot/certbot
+    container_name: time-account-certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - web-root:/var/www/html
+    command: certonly --webroot --webroot-path=/var/www/html --email ${ADMIN_EMAIL_1} --agree-tos --no-eff-email --staging -d ${DOMAIN_NAME}
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
-  db_data:
+  mysql-data:
+    driver: local
+  app-logs:
+    driver: local
+  certbot-etc:
+    driver: local
+  certbot-var:
+    driver: local
+  web-root:
+    driver: local

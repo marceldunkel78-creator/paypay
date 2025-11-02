@@ -26,6 +26,16 @@ app.get('/', (req, res) => {
     res.sendFile('index.html', { root: 'public' });
 });
 
+// Health check endpoint for Docker
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        version: '1.0.0'
+    });
+});
+
 // API info endpoint  
 app.get('/api', (req, res) => {
     res.json({

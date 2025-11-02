@@ -1,33 +1,35 @@
--- Household Tasks Migration
--- Erstellt Tabelle für vordefinierte Hausarbeiten mit festen Zeitwerten
+-- ==============================================
+-- Migration 004: Household Tasks
+-- Description: Creates predefined household tasks with fixed time values
+-- ==============================================
 
+-- Create household tasks table for predefined tasks with fixed time rewards
 CREATE TABLE IF NOT EXISTS household_tasks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     hours DECIMAL(4,2) NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_active (is_active),
+    INDEX idx_name (name),
+    INDEX idx_hours (hours)
 );
 
--- Beispiel-Hausarbeiten einfügen
+-- Insert sample household tasks with their time values
 INSERT IGNORE INTO household_tasks (name, hours, is_active) VALUES
-('Küche aufräumen', 0.5, TRUE),
-('Staubsaugen (ganze Wohnung)', 1.0, TRUE),
-('Badezimmer putzen', 0.75, TRUE),
-('Wäsche waschen und aufhängen', 0.5, TRUE),
-('Geschirrspüler ausräumen', 0.25, TRUE),
-('Müll rausbringen', 0.25, TRUE),
-('Boden wischen', 1.0, TRUE),
-('Fenster putzen', 1.5, TRUE),
-('Betten beziehen', 0.5, TRUE),
-('Wäsche zusammenlegen', 0.5, TRUE),
-('Kühlschrank reinigen', 1.0, TRUE),
-('Gartenarbeit (1 Stunde)', 1.0, TRUE),
-('Auto waschen', 1.5, TRUE),
-('Keller aufräumen', 2.0, TRUE),
-('Einkaufen erledigen', 1.0, TRUE);
-
--- Index für bessere Performance bei Abfragen
-CREATE INDEX idx_household_tasks_active ON household_tasks(is_active);
-CREATE INDEX idx_household_tasks_name ON household_tasks(name);
+('Kitchen cleanup', 0.5, TRUE),
+('Vacuum entire apartment', 1.0, TRUE),
+('Clean bathroom', 0.75, TRUE),
+('Wash and hang laundry', 0.5, TRUE),
+('Empty dishwasher', 0.25, TRUE),
+('Take out trash', 0.25, TRUE),
+('Mop floors', 1.0, TRUE),
+('Clean windows', 1.5, TRUE),
+('Change bed sheets', 0.5, TRUE),
+('Fold laundry', 0.5, TRUE),
+('Clean refrigerator', 1.0, TRUE),
+('Garden work (1 hour)', 1.0, TRUE),
+('Wash car', 1.5, TRUE),
+('Organize basement', 2.0, TRUE),
+('Grocery shopping', 1.0, TRUE);

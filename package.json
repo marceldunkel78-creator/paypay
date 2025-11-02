@@ -7,8 +7,17 @@
     "start": "ts-node src/server.ts",
     "start:prod": "node dist/server.js",
     "build": "tsc",
+    "build:docker": "docker build -t time-account-app .",
+    "dev": "ts-node --watch src/server.ts",
     "migrate": "powershell -ExecutionPolicy Bypass -File scripts/migrate.ps1",
-    "migrate:unix": "sh scripts/migrate.sh"
+    "migrate:unix": "sh scripts/migrate.sh",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:build": "docker-compose build --no-cache",
+    "backup": "bash scripts/backup.sh",
+    "deploy:pi": "bash scripts/deploy-pi.sh",
+    "ssl:setup": "bash scripts/setup-ssl.sh"
   },
   "dependencies": {
     "bcrypt": "^5.0.1",

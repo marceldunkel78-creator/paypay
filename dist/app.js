@@ -62,8 +62,8 @@ const timeEntryRoutes = new timeentry_routes_1.TimeEntryRoutes();
 const householdTaskRoutes = new household_task_routes_1.HouseholdTaskRoutes();
 app.use('/api/auth', auth_routes_1.default); // No password protection for auth
 app.use('/api/timeaccounts', password_protect_middleware_1.passwordProtect, timeaccount_routes_1.default);
-app.use('/api/timeentries', password_protect_middleware_1.passwordProtect, timeEntryRoutes.router);
-app.use('/api/household-tasks', password_protect_middleware_1.passwordProtect, householdTaskRoutes.router);
+app.use('/api/timeentries', timeEntryRoutes.router); // Only JWT auth, no password protection
+app.use('/api/household-tasks', householdTaskRoutes.router); // Only JWT auth, no password protection
 app.use('/api/admin', password_protect_middleware_1.passwordProtect, admin_routes_1.default);
 // Database connection and migration
 (0, db_1.connectToDatabase)()
