@@ -4,6 +4,7 @@ let currentUser = null;
 let authToken = null;
 let userTimeBalance = 0;
 let refreshInterval = null;
+let householdTasks = []; // Cache für Hausarbeiten
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -150,6 +151,8 @@ function showMainApp() {
     if (currentUser.role !== 'admin') {
         loadTimeBalance();
         loadTimeEntries();
+        loadHouseholdTasks(); // Hausarbeiten für Dropdown laden
+        initializeTimeEntryForm(); // Initialisiere das Zeiterfassungs-Formular
     }
     
     // Show admin section if user is admin
@@ -160,6 +163,7 @@ function showMainApp() {
         document.getElementById('timeEntriesSection').style.display = 'none';
         loadAdminStatistics();
         loadPendingEntries();
+        loadAdminHouseholdTasks(); // Hausarbeiten für Admin laden
     } else {
         document.getElementById('adminSection').style.display = 'none';
         document.getElementById('timeEntrySection').style.display = 'block';
@@ -180,29 +184,181 @@ function showMainApp() {
     }, 30000);
 }
 
+// Initialize time entry form with default states
+function initializeTimeEntryForm() {
+    // Set default entry type to productive
+    const entryTypeSelect = document.getElementById('entryType');
+    if (entryTypeSelect) {
+        entryTypeSelect.value = 'productive';
+    }
+    
+    // Initialize UI visibility
+    toggleTimeEntryMode();
+    updateTaskHoursDisplay();
+}
+
+// Household Tasks Functions
+async function loadHouseholdTasks() {
+    try {
+        const response = await fetch(`${API_BASE}/household-tasks/active`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            }
+        });
+        
+        if (response.ok) {
+            householdTasks = await response.json();
+            populateHouseholdTaskDropdown();
+        } else {
+            console.error('Failed to load household tasks');
+        }
+    } catch (error) {
+        console.error('Error loading household tasks:', error);
+    }
+}
+
+function populateHouseholdTaskDropdown() {
+    const dropdown = document.getElementById('householdTask');
+    if (!dropdown) return;
+    
+    // Clear existing options (except first placeholder)
+    dropdown.innerHTML = '<option value="">-- Hausarbeit auswählen --</option>';
+    
+    // Add household tasks (already sorted alphabetically from API)
+    householdTasks.forEach(task => {
+        const option = document.createElement('option');
+        option.value = task.id;
+        option.textContent = `${task.name} (${task.hours}h)`;
+        option.dataset.hours = task.hours;
+        dropdown.appendChild(option);
+    });
+    
+    // Add event listener for hours display
+    dropdown.addEventListener('change', updateTaskHoursDisplay);
+    
+    // Add event listener for entry type changes
+    const entryTypeDropdown = document.getElementById('entryType');
+    if (entryTypeDropdown) {
+        entryTypeDropdown.addEventListener('change', toggleTimeEntryMode);
+    }
+    
+    // Add event listener for manual hours input
+    const manualHoursInput = document.getElementById('manualHours');
+    if (manualHoursInput) {
+        manualHoursInput.addEventListener('input', updateTaskHoursDisplay);
+    }
+}
+
+// Toggle between different time entry modes
+function toggleTimeEntryMode() {
+    const entryType = document.getElementById('entryType').value;
+    const householdTaskGroup = document.getElementById('householdTaskGroup');
+    const manualTimeGroup = document.getElementById('manualTimeGroup');
+    const householdTaskSelect = document.getElementById('householdTask');
+    
+    if (entryType === 'screen_time') {
+        // Bildschirmzeit: Manuelle Eingabe anzeigen, Hausarbeiten verstecken
+        householdTaskGroup.style.display = 'none';
+        manualTimeGroup.style.display = 'block';
+        householdTaskSelect.required = false;
+        householdTaskSelect.value = ''; // Clear selection
+    } else {
+        // Produktive Zeit: Hausarbeiten-Auswahl anzeigen, manuelle Eingabe verstecken
+        householdTaskGroup.style.display = 'block';
+        manualTimeGroup.style.display = 'none';
+        householdTaskSelect.required = true;
+        // Clear manual input
+        const manualHoursInput = document.getElementById('manualHours');
+        if (manualHoursInput) {
+            manualHoursInput.value = '';
+        }
+    }
+    updateTaskHoursDisplay();
+}
+
+function updateTaskHoursDisplay() {
+    const entryType = document.getElementById('entryType').value;
+    
+    if (entryType === 'screen_time') {
+        // Handle manual time input display for screen time
+        const manualHours = document.getElementById('manualHours').value;
+        const manualDisplay = document.querySelector('.manual-hours-display');
+        if (manualDisplay) {
+            if (manualHours && parseFloat(manualHours) > 0) {
+                const hours = parseFloat(manualHours);
+                manualDisplay.textContent = `Zeitwert: -${hours}h (negative Zeit)`;
+                manualDisplay.style.color = '#ef4444';
+            } else {
+                manualDisplay.textContent = 'Zeitwert: wird als negative Zeit gerechnet';
+                manualDisplay.style.color = '#666';
+            }
+        }
+    } else {
+        // Handle household task selection display for productive time
+        const dropdown = document.getElementById('householdTask');
+        const display = document.getElementById('taskHoursDisplay');
+        
+        if (!dropdown || !display) return;
+        
+        const selectedOption = dropdown.options[dropdown.selectedIndex];
+        
+        if (selectedOption.value === '') {
+            display.textContent = 'Zeitwert wird angezeigt';
+            display.style.color = '#666';
+        } else {
+            const hours = parseFloat(selectedOption.dataset.hours);
+            display.textContent = `Zeitwert: +${hours}h`;
+            display.style.color = '#10b981';
+        }
+    }
+}
+
 // New Time Entry Functions
 async function createTimeEntry(event) {
     event.preventDefault();
     
-    const hours = parseFloat(document.getElementById('timeHours').value);
     const entryType = document.getElementById('entryType').value;
     const description = document.getElementById('timeDescription').value;
     
-    // Für Bildschirmzeit negative Stunden verwenden
-    const finalHours = entryType === 'screen_time' ? -Math.abs(hours) : Math.abs(hours);
+    let taskId = null;
+    let manualHours = null;
+    
+    // Validate input based on entry type
+    if (entryType === 'productive') {
+        // Productive time always requires a household task
+        taskId = document.getElementById('householdTask').value;
+        if (!taskId) {
+            showMessage('Bitte wählen Sie eine Hausarbeit aus', 'error');
+            return;
+        }
+    } else if (entryType === 'screen_time') {
+        // Screen time uses manual input
+        manualHours = parseFloat(document.getElementById('manualHours').value);
+        if (!manualHours || manualHours <= 0) {
+            showMessage('Bitte geben Sie eine gültige Stundenzahl ein', 'error');
+            return;
+        }
+    }
     
     try {
+        const requestBody = {
+            entry_type: entryType,
+            description: description
+        };
+        
+        if (taskId) {
+            requestBody.task_id = parseInt(taskId);
+        } else if (manualHours) {
+            requestBody.hours = -manualHours; // Negative for screen time
+        }
+        
         const response = await fetch(`${API_BASE}/timeentries`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`,
             },
-            body: JSON.stringify({ 
-                hours: finalHours,
-                entry_type: entryType,
-                description: description
-            })
+            body: JSON.stringify(requestBody)
         });
         
         const data = await response.json();
@@ -210,9 +366,12 @@ async function createTimeEntry(event) {
         if (response.ok) {
             showMessage('Zeiterfassung erstellt und wartet auf Genehmigung!', 'success');
             // Reset form
-            document.getElementById('timeHours').value = '';
+            document.getElementById('householdTask').value = '';
             document.getElementById('timeDescription').value = '';
+            document.getElementById('manualHours').value = '';
             document.getElementById('entryType').value = 'productive';
+            toggleTimeEntryMode(); // Reset UI visibility
+            updateTaskHoursDisplay(); // Update display after reset
             
             // Reload data
             loadTimeEntries();
@@ -308,7 +467,7 @@ function displayTimeEntries(entries) {
                     ${entry.status === 'pending' ? `<button onclick="deleteTimeEntry(${entry.id})" class="delete-btn">×</button>` : ''}
                 </div>
                 <div class="entry-details">
-                    <p class="entry-description">${entry.description || 'Keine Beschreibung'}</p>
+                    <p class="entry-description">${formatEntryDescription(entry)}</p>
                     <small class="entry-timestamp">${date} um ${time}</small>
                 </div>
             </div>
@@ -564,13 +723,39 @@ function generateUserEntriesHTML(entries) {
                     <span class="modal-entry-status">${statusLabel}</span>
                 </div>
                 <div class="modal-entry-details">
-                    <p class="modal-entry-description">${entry.description || 'Keine Beschreibung'}</p>
+                    <p class="modal-entry-description">${formatEntryDescription(entry)}</p>
                     <small class="modal-entry-timestamp">${date} um ${time}</small>
                 </div>
                 ${actionButtons}
             </div>
         `;
     }).join('');
+}
+
+// Format entry description with household task details
+function formatEntryDescription(entry) {
+    let description = '';
+    
+    // Add household task name if available
+    if (entry.task_name) {
+        description = entry.task_name;
+        
+        // Add user description in parentheses if available
+        if (entry.description && entry.description.trim()) {
+            description += ` (${entry.description.trim()})`;
+        }
+    } else {
+        // For manual entries or entries without task
+        if (entry.description && entry.description.trim()) {
+            description = entry.description.trim();
+        } else {
+            description = entry.entry_type === 'screen_time' ? 
+                'Manuelle Bildschirmzeit-Eingabe' : 
+                'Keine Beschreibung';
+        }
+    }
+    
+    return description;
 }
 
 function closeUserEntriesModal() {
@@ -1076,5 +1261,265 @@ async function refreshUserEntriesModal(username) {
         }
     } catch (error) {
         console.error('Error refreshing user entries modal:', error);
+    }
+}
+
+// Hausarbeiten-Verwaltung Funktionen
+function showHouseholdTasksManagement() {
+    // Hausarbeiten-Sektion zeigen
+    const householdTasksSection = document.getElementById('householdTasksManagement');
+    if (householdTasksSection) {
+        householdTasksSection.style.display = 'block';
+        loadAdminHouseholdTasks();
+    }
+}
+
+function hideHouseholdTasksManagement() {
+    // Hausarbeiten-Sektion verstecken
+    const householdTasksSection = document.getElementById('householdTasksManagement');
+    if (householdTasksSection) {
+        householdTasksSection.style.display = 'none';
+    }
+}
+
+async function loadAdminHouseholdTasks() {
+    try {
+        const response = await fetch(`${API_BASE}/household-tasks/admin/all`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const tasks = await response.json();
+            displayAdminHouseholdTasks(tasks);
+        } else {
+            console.error('Failed to load household tasks');
+        }
+    } catch (error) {
+        console.error('Error loading household tasks:', error);
+    }
+}
+
+function displayAdminHouseholdTasks(tasks) {
+    const tasksList = document.getElementById('adminTasksList');
+    if (!tasksList) return;
+    
+    if (tasks.length === 0) {
+        tasksList.innerHTML = '<p class="no-tasks">Keine Hausarbeiten vorhanden</p>';
+        return;
+    }
+    
+    tasksList.innerHTML = tasks.map(task => `
+        <div class="task-item">
+            <div class="task-info">
+                <h4>${task.name}</h4>
+                <span class="task-hours">${task.hours} Stunden</span>
+                <span class="task-status ${task.is_active ? 'active' : 'inactive'}">
+                    ${task.is_active ? 'Aktiv' : 'Inaktiv'}
+                </span>
+            </div>
+            <div class="task-actions">
+                <button onclick="editHouseholdTask(${task.id})" class="btn-edit">Bearbeiten</button>
+                <button onclick="toggleHouseholdTaskStatus(${task.id}, ${!task.is_active})" 
+                        class="btn-toggle ${task.is_active ? 'deactivate' : 'activate'}">
+                    ${task.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                </button>
+                <button onclick="deleteHouseholdTask(${task.id})" class="btn-delete">Löschen</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function createHouseholdTask(event) {
+    // Verhindere das normale Form-Submit
+    if (event) {
+        event.preventDefault();
+    }
+    
+    const nameInput = document.getElementById('taskName');
+    const hoursInput = document.getElementById('taskHours');
+    
+    const name = nameInput.value.trim();
+    const hours = parseFloat(hoursInput.value);
+    
+    if (!name) {
+        showMessage('Bitte geben Sie einen Namen für die Hausarbeit ein', 'error');
+        return;
+    }
+    
+    if (!hours || hours <= 0) {
+        showMessage('Bitte geben Sie eine gültige Stundenzahl ein', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/household-tasks/admin/create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ name, hours })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showMessage('Hausarbeit erfolgreich erstellt!', 'success');
+            nameInput.value = '';
+            hoursInput.value = '';
+            loadAdminHouseholdTasks();
+            
+            // Auch das User-Dropdown aktualisieren falls vorhanden
+            if (currentUser.role !== 'admin') {
+                loadHouseholdTasks();
+            }
+        } else {
+            showMessage(data.message || 'Fehler beim Erstellen der Hausarbeit', 'error');
+        }
+    } catch (error) {
+        console.error('Error creating household task:', error);
+        showMessage('Fehler beim Erstellen der Hausarbeit', 'error');
+    }
+}
+
+async function editHouseholdTask(taskId) {
+    try {
+        // Zuerst die aktuellen Daten der Hausarbeit laden
+        const response = await fetch(`${API_BASE}/household-tasks/admin/${taskId}`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const task = await response.json();
+            // Modal mit aktuellen Werten füllen
+            document.getElementById('editTaskName').value = task.name;
+            document.getElementById('editTaskHours').value = task.hours;
+            document.getElementById('editTaskModal').dataset.taskId = taskId;
+            showEditTaskModal();
+        } else {
+            showMessage('Fehler beim Laden der Hausarbeit', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading task for edit:', error);
+        showMessage('Netzwerkfehler beim Laden der Hausarbeit', 'error');
+    }
+}
+
+function showEditTaskModal() {
+    document.getElementById('editTaskModal').style.display = 'block';
+}
+
+function closeEditTaskModal() {
+    document.getElementById('editTaskModal').style.display = 'none';
+}
+
+async function saveEditedTask(event) {
+    event.preventDefault();
+    
+    const taskId = document.getElementById('editTaskModal').dataset.taskId;
+    const newName = document.getElementById('editTaskName').value.trim();
+    const newHours = parseFloat(document.getElementById('editTaskHours').value);
+    
+    if (!newName) {
+        showMessage('Bitte geben Sie einen Namen ein', 'error');
+        return;
+    }
+    
+    if (!newHours || newHours <= 0) {
+        showMessage('Bitte geben Sie eine gültige Stundenzahl ein', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/household-tasks/admin/${taskId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ 
+                name: newName, 
+                hours: newHours 
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showMessage('Hausarbeit erfolgreich aktualisiert!', 'success');
+            closeEditTaskModal();
+            loadAdminHouseholdTasks(); // Liste aktualisieren
+        } else {
+            showMessage(data.error || 'Fehler beim Aktualisieren der Hausarbeit', 'error');
+        }
+    } catch (error) {
+        showMessage('Netzwerkfehler beim Aktualisieren der Hausarbeit', 'error');
+        console.error('Update household task error:', error);
+    }
+}
+
+async function toggleHouseholdTaskStatus(taskId, newStatus) {
+    try {
+        const response = await fetch(`${API_BASE}/household-tasks/admin/${taskId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ is_active: newStatus })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showMessage(`Hausarbeit erfolgreich ${newStatus ? 'aktiviert' : 'deaktiviert'}!`, 'success');
+            loadAdminHouseholdTasks();
+            
+            // Auch das User-Dropdown aktualisieren falls vorhanden
+            if (currentUser.role !== 'admin') {
+                loadHouseholdTasks();
+            }
+        } else {
+            showMessage(data.message || 'Fehler beim Ändern des Status', 'error');
+        }
+    } catch (error) {
+        console.error('Error toggling household task status:', error);
+        showMessage('Fehler beim Ändern des Status', 'error');
+    }
+}
+
+async function deleteHouseholdTask(taskId) {
+    if (!confirm('Sind Sie sicher, dass Sie diese Hausarbeit löschen möchten?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/household-tasks/admin/${taskId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showMessage('Hausarbeit erfolgreich gelöscht!', 'success');
+            loadAdminHouseholdTasks();
+            
+            // Auch das User-Dropdown aktualisieren falls vorhanden
+            if (currentUser.role !== 'admin') {
+                loadHouseholdTasks();
+            }
+        } else {
+            showMessage(data.message || 'Fehler beim Löschen der Hausarbeit', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting household task:', error);
+        showMessage('Fehler beim Löschen der Hausarbeit', 'error');
     }
 }

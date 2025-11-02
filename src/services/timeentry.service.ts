@@ -1,21 +1,57 @@
 import { connectToDatabase } from '../db';
 import { TimeEntry, UserTimeBalance } from '../models/timeentry.model';
+import { HouseholdTaskService } from './household-task.service';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 export class TimeEntryService {
+    private householdTaskService: HouseholdTaskService;
+    
+    constructor() {
+        this.householdTaskService = new HouseholdTaskService();
+    }
     
     // Neue Zeiterfassung erstellen (positiv oder negativ) - Status: pending
     async createTimeEntry(timeEntry: Omit<TimeEntry, 'id' | 'created_at' | 'approved_at' | 'approved_by'>): Promise<TimeEntry> {
         try {
             const db = await connectToDatabase();
+            
+            let finalHours = timeEntry.hours;
+            
+            // Wenn task_id gegeben ist, Stunden aus Hausarbeiten-Tabelle laden
+            if (timeEntry.task_id) {
+                const task = await this.householdTaskService.getHouseholdTaskById(timeEntry.task_id);
+                if (!task) {
+                    throw new Error('Hausarbeit nicht gefunden');
+                }
+                if (!task.is_active) {
+                    throw new Error('Hausarbeit ist nicht aktiv');
+                }
+                
+                // Positive oder negative Stunden basierend auf entry_type
+                finalHours = timeEntry.entry_type === 'screen_time' ? -Math.abs(task.hours) : Math.abs(task.hours);
+            } else {
+                // Für manuelle Eingaben: Stunden direkt verwenden (sollten bereits korrekt sein)
+                finalHours = timeEntry.hours;
+                
+                // Validierung: Manuelle Eingaben sind nur für screen_time erlaubt
+                if (timeEntry.entry_type !== 'screen_time') {
+                    throw new Error('Manuelle Stundeneingabe nur für Bildschirmzeit erlaubt');
+                }
+                
+                // Sicherstellen, dass manuelle screen_time negative Werte hat
+                if (finalHours >= 0) {
+                    throw new Error('Bildschirmzeit muss negativ sein');
+                }
+            }
+            
             const query = `
-                INSERT INTO time_entries (user_id, hours, entry_type, description, status)
-                VALUES (?, ?, ?, ?, 'pending')
+                INSERT INTO time_entries (user_id, task_id, hours, entry_type, description, status)
+                VALUES (?, ?, ?, ?, ?, 'pending')
             `;
             
             const [result] = await db.execute<ResultSetHeader>(
                 query,
-                [timeEntry.user_id, timeEntry.hours, timeEntry.entry_type, timeEntry.description || null]
+                [timeEntry.user_id, timeEntry.task_id || null, finalHours, timeEntry.entry_type, timeEntry.description || null]
             );
 
             console.log('Time entry created (pending approval):', result.insertId);
@@ -26,6 +62,7 @@ export class TimeEntryService {
             return {
                 id: result.insertId,
                 ...timeEntry,
+                hours: finalHours,
                 status: 'pending',
                 created_at: new Date()
             };
@@ -43,32 +80,37 @@ export class TimeEntryService {
             const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
             
             let query = `
-                SELECT id, user_id, hours, entry_type, description, status, created_at, approved_at, approved_by
-                FROM time_entries 
-                WHERE user_id = ?
+                SELECT te.id, te.user_id, te.task_id, te.hours, te.entry_type, te.description, 
+                       te.status, te.created_at, te.approved_at, te.approved_by,
+                       ht.name as task_name
+                FROM time_entries te
+                LEFT JOIN household_tasks ht ON te.task_id = ht.id
+                WHERE te.user_id = ?
             `;
             
             const params: any[] = [userId];
             
             if (status) {
-                query += ` AND status = ?`;
+                query += ` AND te.status = ?`;
                 params.push(status);
             }
             
-            query += ` ORDER BY created_at DESC LIMIT ${safeLimit}`;
+            query += ` ORDER BY te.created_at DESC LIMIT ${safeLimit}`;
             
             const [rows] = await db.execute<RowDataPacket[]>(query, params);
             
             return rows.map((row: any) => ({
                 id: row.id,
                 user_id: row.user_id,
+                task_id: row.task_id,
                 hours: parseFloat(row.hours),
                 entry_type: row.entry_type,
                 description: row.description,
                 status: row.status,
                 created_at: new Date(row.created_at),
                 approved_at: row.approved_at ? new Date(row.approved_at) : undefined,
-                approved_by: row.approved_by
+                approved_by: row.approved_by,
+                task_name: row.task_name // Name der Hausarbeit
             }));
         } catch (error) {
             console.error('Error fetching user time entries:', error);
@@ -366,10 +408,13 @@ export class TimeEntryService {
         try {
             const db = await connectToDatabase();
             const query = `
-                SELECT te.id, te.user_id, te.hours, te.entry_type, te.description, te.status, te.created_at,
-                       u.username
+                SELECT te.id, te.user_id, te.task_id, te.hours, te.entry_type, te.description, 
+                       te.status, te.created_at,
+                       u.username,
+                       ht.name as task_name
                 FROM time_entries te
                 JOIN users u ON te.user_id = u.id
+                LEFT JOIN household_tasks ht ON te.task_id = ht.id
                 WHERE te.status = 'pending'
                 ORDER BY te.created_at ASC
             `;
@@ -379,12 +424,14 @@ export class TimeEntryService {
             return rows.map((row: any) => ({
                 id: row.id,
                 user_id: row.user_id,
+                task_id: row.task_id,
                 username: row.username,
                 hours: parseFloat(row.hours),
                 entry_type: row.entry_type,
                 description: row.description,
                 status: row.status,
-                created_at: new Date(row.created_at)
+                created_at: new Date(row.created_at),
+                task_name: row.task_name
             } as any));
         } catch (error) {
             console.error('Error fetching pending time entries:', error);

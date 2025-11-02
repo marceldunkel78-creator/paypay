@@ -12,7 +12,7 @@ export class TimeEntryController {
     // Neue Zeiterfassung erstellen (Status: pending)
     async createTimeEntry(req: Request, res: Response): Promise<void> {
         try {
-            const { hours, entry_type, description } = req.body;
+            const { task_id, entry_type, description, hours } = req.body;
             const user_id = (req as any).user?.id;
             const user_role = (req as any).user?.role;
 
@@ -27,8 +27,8 @@ export class TimeEntryController {
                 return;
             }
 
-            if (!hours || !entry_type) {
-                res.status(400).json({ error: 'Stunden und Eintragstyp sind erforderlich' });
+            if (!entry_type) {
+                res.status(400).json({ error: 'Eintragstyp ist erforderlich' });
                 return;
             }
 
@@ -37,9 +37,28 @@ export class TimeEntryController {
                 return;
             }
 
+            // Validation: Either task_id or manual hours must be provided
+            if (!task_id && !hours) {
+                res.status(400).json({ error: 'Entweder Hausarbeit oder manuelle Stundeneingabe ist erforderlich' });
+                return;
+            }
+
+            // Validation: If hours provided, it must be for screen_time and negative
+            if (hours !== undefined) {
+                if (entry_type !== 'screen_time') {
+                    res.status(400).json({ error: 'Manuelle Stundeneingabe nur für Bildschirmzeit erlaubt' });
+                    return;
+                }
+                if (typeof hours !== 'number' || hours >= 0) {
+                    res.status(400).json({ error: 'Bildschirmzeit muss als negative Zahl angegeben werden' });
+                    return;
+                }
+            }
+
             const timeEntry: Omit<TimeEntry, 'id' | 'created_at' | 'approved_at' | 'approved_by'> = {
                 user_id,
-                hours: parseFloat(hours),
+                task_id: task_id ? parseInt(task_id) : undefined,
+                hours: hours || 0, // Use provided hours or 0 (will be set by service for task-based entries)
                 entry_type,
                 description: description || '',
                 status: 'pending'

@@ -1,6 +1,7 @@
 export interface TimeEntry {
     id?: number;
     user_id: number;
+    task_id?: number; // Referenz zur Hausarbeit (optional für Rückwärtskompatibilität)
     hours: number; // Kann positiv (produktive Zeit) oder negativ (Bildschirmzeit) sein
     entry_type: 'productive' | 'screen_time';
     description?: string;
@@ -8,6 +9,9 @@ export interface TimeEntry {
     created_at?: Date;
     approved_at?: Date;
     approved_by?: number; // Admin user_id who approved
+    // Zusätzliche Felder für erweiterte Anzeige
+    username?: string;
+    task_name?: string; // Name der Hausarbeit für Anzeige
 }
 
 export interface UserTimeBalance {

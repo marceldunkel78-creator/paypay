@@ -17,10 +17,13 @@ const body_parser_1 = require("body-parser");
 const db_1 = require("./db");
 const migrate_timeentries_1 = require("./db/migrate-timeentries");
 const migrate_approval_1 = require("./db/migrate-approval");
+const migrate_household_tasks_1 = require("./db/migrate-household-tasks");
+const migrate_timeentries_task_id_1 = require("./db/migrate-timeentries-task-id");
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const timeaccount_routes_1 = __importDefault(require("./routes/timeaccount.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const timeentry_routes_1 = require("./routes/timeentry.routes");
+const household_task_routes_1 = require("./routes/household-task.routes");
 const password_protect_middleware_1 = require("./middlewares/password-protect.middleware");
 const app = (0, express_1.default)();
 // Middleware
@@ -56,9 +59,11 @@ app.get('/health', (req, res) => {
 });
 // Routes with different protection levels
 const timeEntryRoutes = new timeentry_routes_1.TimeEntryRoutes();
+const householdTaskRoutes = new household_task_routes_1.HouseholdTaskRoutes();
 app.use('/api/auth', auth_routes_1.default); // No password protection for auth
 app.use('/api/timeaccounts', password_protect_middleware_1.passwordProtect, timeaccount_routes_1.default);
 app.use('/api/timeentries', password_protect_middleware_1.passwordProtect, timeEntryRoutes.router);
+app.use('/api/household-tasks', password_protect_middleware_1.passwordProtect, householdTaskRoutes.router);
 app.use('/api/admin', password_protect_middleware_1.passwordProtect, admin_routes_1.default);
 // Database connection and migration
 (0, db_1.connectToDatabase)()
@@ -68,6 +73,10 @@ app.use('/api/admin', password_protect_middleware_1.passwordProtect, admin_route
     yield (0, migrate_timeentries_1.migrateTimeEntries)();
     // Run approval system migration
     yield (0, migrate_approval_1.migrateApprovalSystem)();
+    // Run household tasks migration
+    yield (0, migrate_household_tasks_1.migrateHouseholdTasks)();
+    // Run time entries task_id migration
+    yield (0, migrate_timeentries_task_id_1.migrateTimeEntriesTaskId)();
 }))
     .catch((error) => {
     console.error('Database connection failed:', error);

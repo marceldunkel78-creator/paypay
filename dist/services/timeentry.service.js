@@ -11,21 +11,38 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimeEntryService = void 0;
 const db_1 = require("../db");
+const household_task_service_1 = require("./household-task.service");
 class TimeEntryService {
+    constructor() {
+        this.householdTaskService = new household_task_service_1.HouseholdTaskService();
+    }
     // Neue Zeiterfassung erstellen (positiv oder negativ) - Status: pending
     createTimeEntry(timeEntry) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
+                let finalHours = timeEntry.hours;
+                // Wenn task_id gegeben ist, Stunden aus Hausarbeiten-Tabelle laden
+                if (timeEntry.task_id) {
+                    const task = yield this.householdTaskService.getHouseholdTaskById(timeEntry.task_id);
+                    if (!task) {
+                        throw new Error('Hausarbeit nicht gefunden');
+                    }
+                    if (!task.is_active) {
+                        throw new Error('Hausarbeit ist nicht aktiv');
+                    }
+                    // Positive oder negative Stunden basierend auf entry_type
+                    finalHours = timeEntry.entry_type === 'screen_time' ? -Math.abs(task.hours) : Math.abs(task.hours);
+                }
                 const query = `
-                INSERT INTO time_entries (user_id, hours, entry_type, description, status)
-                VALUES (?, ?, ?, ?, 'pending')
+                INSERT INTO time_entries (user_id, task_id, hours, entry_type, description, status)
+                VALUES (?, ?, ?, ?, ?, 'pending')
             `;
-                const [result] = yield db.execute(query, [timeEntry.user_id, timeEntry.hours, timeEntry.entry_type, timeEntry.description || null]);
+                const [result] = yield db.execute(query, [timeEntry.user_id, timeEntry.task_id || null, finalHours, timeEntry.entry_type, timeEntry.description || null]);
                 console.log('Time entry created (pending approval):', result.insertId);
                 // NICHT die Balance aktualisieren - erst bei Genehmigung!
                 // Neu erstellten Eintrag zurückgeben
-                return Object.assign(Object.assign({ id: result.insertId }, timeEntry), { status: 'pending', created_at: new Date() });
+                return Object.assign(Object.assign({ id: result.insertId }, timeEntry), { hours: finalHours, status: 'pending', created_at: new Date() });
             }
             catch (error) {
                 console.error('Error creating time entry:', error);
@@ -41,27 +58,32 @@ class TimeEntryService {
                 // Validate and sanitize limit parameter
                 const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
                 let query = `
-                SELECT id, user_id, hours, entry_type, description, status, created_at, approved_at, approved_by
-                FROM time_entries 
-                WHERE user_id = ?
+                SELECT te.id, te.user_id, te.task_id, te.hours, te.entry_type, te.description, 
+                       te.status, te.created_at, te.approved_at, te.approved_by,
+                       ht.name as task_name
+                FROM time_entries te
+                LEFT JOIN household_tasks ht ON te.task_id = ht.id
+                WHERE te.user_id = ?
             `;
                 const params = [userId];
                 if (status) {
-                    query += ` AND status = ?`;
+                    query += ` AND te.status = ?`;
                     params.push(status);
                 }
-                query += ` ORDER BY created_at DESC LIMIT ${safeLimit}`;
+                query += ` ORDER BY te.created_at DESC LIMIT ${safeLimit}`;
                 const [rows] = yield db.execute(query, params);
                 return rows.map((row) => ({
                     id: row.id,
                     user_id: row.user_id,
+                    task_id: row.task_id,
                     hours: parseFloat(row.hours),
                     entry_type: row.entry_type,
                     description: row.description,
                     status: row.status,
                     created_at: new Date(row.created_at),
                     approved_at: row.approved_at ? new Date(row.approved_at) : undefined,
-                    approved_by: row.approved_by
+                    approved_by: row.approved_by,
+                    task_name: row.task_name // Name der Hausarbeit
                 }));
             }
             catch (error) {
@@ -345,10 +367,13 @@ class TimeEntryService {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
                 const query = `
-                SELECT te.id, te.user_id, te.hours, te.entry_type, te.description, te.status, te.created_at,
-                       u.username
+                SELECT te.id, te.user_id, te.task_id, te.hours, te.entry_type, te.description, 
+                       te.status, te.created_at,
+                       u.username,
+                       ht.name as task_name
                 FROM time_entries te
                 JOIN users u ON te.user_id = u.id
+                LEFT JOIN household_tasks ht ON te.task_id = ht.id
                 WHERE te.status = 'pending'
                 ORDER BY te.created_at ASC
             `;
@@ -356,12 +381,14 @@ class TimeEntryService {
                 return rows.map((row) => ({
                     id: row.id,
                     user_id: row.user_id,
+                    task_id: row.task_id,
                     username: row.username,
                     hours: parseFloat(row.hours),
                     entry_type: row.entry_type,
                     description: row.description,
                     status: row.status,
-                    created_at: new Date(row.created_at)
+                    created_at: new Date(row.created_at),
+                    task_name: row.task_name
                 }));
             }
             catch (error) {

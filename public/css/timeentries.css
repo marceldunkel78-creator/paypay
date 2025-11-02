@@ -37,6 +37,43 @@
     opacity: 0.8;
 }
 
+/* Entry Mode Selection Styles */
+.radio-group {
+    background: #f8fafc;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.radio-label {
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.radio-label:hover {
+    background-color: #e2e8f0;
+}
+
+.radio-label input[type="radio"]:checked + * {
+    font-weight: 600;
+    color: #4f46e5;
+}
+
+/* Manual Time Input Highlight */
+#manualTimeGroup {
+    background: #fef3c7;
+    padding: 16px;
+    border-radius: 8px;
+    border: 2px solid #f59e0b;
+}
+
+#manualTimeGroup label {
+    color: #92400e;
+    font-weight: 600;
+}
+
 /* Time Entries List Styles */
 .time-entries-list {
     display: flex;

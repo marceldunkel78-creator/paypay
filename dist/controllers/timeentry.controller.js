@@ -20,7 +20,7 @@ class TimeEntryController {
         var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { hours, entry_type, description } = req.body;
+                const { task_id, entry_type, description } = req.body;
                 const user_id = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
                 const user_role = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
                 if (!user_id) {
@@ -32,8 +32,8 @@ class TimeEntryController {
                     res.status(403).json({ error: 'Admins können keine Zeiteinträge erstellen' });
                     return;
                 }
-                if (!hours || !entry_type) {
-                    res.status(400).json({ error: 'Stunden und Eintragstyp sind erforderlich' });
+                if (!task_id || !entry_type) {
+                    res.status(400).json({ error: 'Hausarbeit und Eintragstyp sind erforderlich' });
                     return;
                 }
                 if (!['productive', 'screen_time'].includes(entry_type)) {
@@ -42,7 +42,8 @@ class TimeEntryController {
                 }
                 const timeEntry = {
                     user_id,
-                    hours: parseFloat(hours),
+                    task_id: parseInt(task_id),
+                    hours: 0,
                     entry_type,
                     description: description || '',
                     status: 'pending'

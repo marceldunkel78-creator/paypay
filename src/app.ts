@@ -3,10 +3,13 @@ import { json, urlencoded } from 'body-parser';
 import { connectToDatabase } from './db';
 import { migrateTimeEntries } from './db/migrate-timeentries';
 import { migrateApprovalSystem } from './db/migrate-approval';
+import { migrateHouseholdTasks } from './db/migrate-household-tasks';
+import { migrateTimeEntriesTaskId } from './db/migrate-timeentries-task-id';
 import authRoutes from './routes/auth.routes';
 import timeAccountRoutes from './routes/timeaccount.routes';
 import adminRoutes from './routes/admin.routes';
 import { TimeEntryRoutes } from './routes/timeentry.routes';
+import { HouseholdTaskRoutes } from './routes/household-task.routes';
 import { passwordProtect } from './middlewares/password-protect.middleware';
 
 const app = express();
@@ -49,10 +52,12 @@ app.get('/health', (req, res) => {
 
 // Routes with different protection levels
 const timeEntryRoutes = new TimeEntryRoutes();
+const householdTaskRoutes = new HouseholdTaskRoutes();
 
 app.use('/api/auth', authRoutes); // No password protection for auth
 app.use('/api/timeaccounts', passwordProtect, timeAccountRoutes);
-app.use('/api/timeentries', passwordProtect, timeEntryRoutes.router);
+app.use('/api/timeentries', timeEntryRoutes.router); // Only JWT auth, no password protection
+app.use('/api/household-tasks', householdTaskRoutes.router); // Only JWT auth, no password protection
 app.use('/api/admin', passwordProtect, adminRoutes);
 
 // Database connection and migration
@@ -63,6 +68,10 @@ connectToDatabase()
     await migrateTimeEntries();
     // Run approval system migration
     await migrateApprovalSystem();
+    // Run household tasks migration
+    await migrateHouseholdTasks();
+    // Run time entries task_id migration
+    await migrateTimeEntriesTaskId();
   })
   .catch((error) => {
     console.error('Database connection failed:', error);

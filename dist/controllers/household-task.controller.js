@@ -1,0 +1,204 @@
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.HouseholdTaskController = void 0;
+const household_task_service_1 = require("../services/household-task.service");
+class HouseholdTaskController {
+    constructor() {
+        this.householdTaskService = new household_task_service_1.HouseholdTaskService();
+    }
+    // Aktive Hausarbeiten für User abrufen
+    getActiveHouseholdTasks(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const tasks = yield this.householdTaskService.getActiveHouseholdTasks();
+                res.json(tasks);
+            }
+            catch (error) {
+                console.error('Error fetching active household tasks:', error);
+                res.status(500).json({ error: 'Fehler beim Abrufen der Hausarbeiten' });
+            }
+        });
+    }
+    // Alle Hausarbeiten für Admin abrufen
+    getAllHouseholdTasks(req, res) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const user_role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
+                if (user_role !== 'admin') {
+                    res.status(403).json({ error: 'Keine Berechtigung' });
+                    return;
+                }
+                const tasks = yield this.householdTaskService.getAllHouseholdTasks();
+                res.json(tasks);
+            }
+            catch (error) {
+                console.error('Error fetching all household tasks:', error);
+                res.status(500).json({ error: 'Fehler beim Abrufen der Hausarbeiten' });
+            }
+        });
+    }
+    // Einzelne Hausarbeit abrufen
+    getHouseholdTaskById(req, res) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { id } = req.params;
+                const user_role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
+                if (user_role !== 'admin') {
+                    res.status(403).json({ error: 'Keine Berechtigung' });
+                    return;
+                }
+                const task = yield this.householdTaskService.getHouseholdTaskById(parseInt(id));
+                if (!task) {
+                    res.status(404).json({ error: 'Hausarbeit nicht gefunden' });
+                    return;
+                }
+                res.json(task);
+            }
+            catch (error) {
+                console.error('Error fetching household task:', error);
+                res.status(500).json({ error: 'Fehler beim Abrufen der Hausarbeit' });
+            }
+        });
+    }
+    // Neue Hausarbeit erstellen (Admin)
+    createHouseholdTask(req, res) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { name, hours, is_active } = req.body;
+                const user_role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
+                if (user_role !== 'admin') {
+                    res.status(403).json({ error: 'Keine Berechtigung' });
+                    return;
+                }
+                if (!name || hours === undefined) {
+                    res.status(400).json({ error: 'Name und Stunden sind erforderlich' });
+                    return;
+                }
+                if (hours < 0 || hours > 24) {
+                    res.status(400).json({ error: 'Stunden müssen zwischen 0 und 24 liegen' });
+                    return;
+                }
+                const taskData = {
+                    name: name.trim(),
+                    hours: parseFloat(hours),
+                    is_active: is_active !== null && is_active !== void 0 ? is_active : true
+                };
+                const createdTask = yield this.householdTaskService.createHouseholdTask(taskData);
+                res.status(201).json({
+                    message: 'Hausarbeit erfolgreich erstellt',
+                    task: createdTask
+                });
+            }
+            catch (error) {
+                console.error('Error creating household task:', error);
+                const errorMessage = error instanceof Error ? error.message : 'Fehler beim Erstellen der Hausarbeit';
+                res.status(400).json({ error: errorMessage });
+            }
+        });
+    }
+    // Hausarbeit aktualisieren (Admin)
+    updateHouseholdTask(req, res) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { id } = req.params;
+                const { name, hours, is_active } = req.body;
+                const user_role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
+                if (user_role !== 'admin') {
+                    res.status(403).json({ error: 'Keine Berechtigung' });
+                    return;
+                }
+                const updateData = {};
+                if (name !== undefined) {
+                    updateData.name = name.trim();
+                }
+                if (hours !== undefined) {
+                    if (hours < 0 || hours > 24) {
+                        res.status(400).json({ error: 'Stunden müssen zwischen 0 und 24 liegen' });
+                        return;
+                    }
+                    updateData.hours = parseFloat(hours);
+                }
+                if (is_active !== undefined) {
+                    updateData.is_active = Boolean(is_active);
+                }
+                const success = yield this.householdTaskService.updateHouseholdTask(parseInt(id), updateData);
+                if (success) {
+                    res.json({ message: 'Hausarbeit erfolgreich aktualisiert' });
+                }
+                else {
+                    res.status(404).json({ error: 'Hausarbeit nicht gefunden oder keine Änderungen' });
+                }
+            }
+            catch (error) {
+                console.error('Error updating household task:', error);
+                const errorMessage = error instanceof Error ? error.message : 'Fehler beim Aktualisieren der Hausarbeit';
+                res.status(400).json({ error: errorMessage });
+            }
+        });
+    }
+    // Hausarbeit löschen (Admin)
+    deleteHouseholdTask(req, res) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { id } = req.params;
+                const user_role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
+                if (user_role !== 'admin') {
+                    res.status(403).json({ error: 'Keine Berechtigung' });
+                    return;
+                }
+                const success = yield this.householdTaskService.deleteHouseholdTask(parseInt(id));
+                if (success) {
+                    res.json({ message: 'Hausarbeit erfolgreich gelöscht' });
+                }
+                else {
+                    res.status(404).json({ error: 'Hausarbeit nicht gefunden' });
+                }
+            }
+            catch (error) {
+                console.error('Error deleting household task:', error);
+                const errorMessage = error instanceof Error ? error.message : 'Fehler beim Löschen der Hausarbeit';
+                res.status(400).json({ error: errorMessage });
+            }
+        });
+    }
+    // Hausarbeit deaktivieren (Admin)
+    deactivateHouseholdTask(req, res) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { id } = req.params;
+                const user_role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
+                if (user_role !== 'admin') {
+                    res.status(403).json({ error: 'Keine Berechtigung' });
+                    return;
+                }
+                const success = yield this.householdTaskService.deactivateHouseholdTask(parseInt(id));
+                if (success) {
+                    res.json({ message: 'Hausarbeit erfolgreich deaktiviert' });
+                }
+                else {
+                    res.status(404).json({ error: 'Hausarbeit nicht gefunden' });
+                }
+            }
+            catch (error) {
+                console.error('Error deactivating household task:', error);
+                res.status(500).json({ error: 'Fehler beim Deaktivieren der Hausarbeit' });
+            }
+        });
+    }
+}
+exports.HouseholdTaskController = HouseholdTaskController;

@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Time Account Management</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="shortcut icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="favicon.png">
+    
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/timeentries.css">
 </head>
@@ -75,22 +82,37 @@
                 <h2>⏱️ Neue Zeiterfassung</h2>
                 <form onsubmit="createTimeEntry(event)" class="time-form">
                     <div class="form-group">
-                        <label for="entryType">Art der Zeit:</label>
-                        <select id="entryType" required>
+                        <label for="entryType">Art des Eintrags:</label>
+                        <select id="entryType" onchange="toggleTimeEntryMode()">
                             <option value="productive">Produktive Zeit (+)</option>
                             <option value="screen_time">Bildschirmzeit (-)</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="timeHours">Stunden:</label>
-                        <input type="number" id="timeHours" step="0.25" min="0" max="24" required>
+                    
+
+                    <!-- Household Task Selection -->
+                    <div id="householdTaskGroup" class="form-group">
+                        <label for="householdTask">Hausarbeit auswählen:</label>
+                        <select id="householdTask">
+                            <option value="">-- Hausarbeit auswählen --</option>
+                            <!-- Options will be loaded dynamically -->
+                        </select>
+                        <small class="task-hours-display" id="taskHoursDisplay">Zeitwert wird angezeigt</small>
+                    </div>
+
+                    <!-- Manual Time Input -->
+                    <div id="manualTimeGroup" class="form-group" style="display: none;">
+                        <label for="manualHours">Bildschirmzeit (Stunden):</label>
+                        <input type="number" id="manualHours" step="0.25" min="0" max="24" placeholder="z.B. 2.5">
+                        <small class="manual-hours-display">Zeitwert: wird als negative Zeit gerechnet</small>
                     </div>
                     <div class="form-group">
                         <label for="timeDescription">Beschreibung (optional):</label>
-                        <input type="text" id="timeDescription" placeholder="Was haben Sie gemacht?">
+                        <input type="text" id="timeDescription" placeholder="Zusätzliche Notizen...">
                     </div>
                     <button type="submit" class="btn btn-primary">Zeiteintrag hinzufügen</button>
                 </form>
+                
             </section>
 
             <!-- Time Entries List -->
@@ -150,14 +172,53 @@
                 <div class="admin-actions">
                     <h3>⚙️ Admin-Aktionen</h3>
                     <button onclick="loadPendingEntries()" class="btn btn-secondary">
-                        � Wartende Einträge aktualisieren
+                        ⏳ Wartende Einträge aktualisieren
                     </button>
                     <button onclick="loadAdminStatistics()" class="btn btn-secondary">
-                        � Statistiken aktualisieren
+                        📊 Statistiken aktualisieren
+                    </button>
+                    <button onclick="showHouseholdTasksManagement()" class="btn btn-primary">
+                        🏠 Hausarbeiten verwalten
                     </button>
                     <button onclick="cleanupOldEntries()" class="btn btn-warning">
                         🗑️ Alte Einträge bereinigen (>1 Woche)
                     </button>
+                </div>
+
+                <!-- Household Tasks Management -->
+                <div id="householdTasksManagement" class="admin-household-tasks" style="display: none;">
+                    <div class="section-header">
+                        <h3>🏠 Hausarbeiten-Verwaltung</h3>
+                        <button onclick="hideHouseholdTasksManagement()" class="btn btn-secondary">← Zurück zum Admin-Bereich</button>
+                    </div>
+                    
+                    <!-- Add New Task Form -->
+                    <div class="task-form-container">
+                        <h4>Neue Hausarbeit hinzufügen</h4>
+                        <form onsubmit="createHouseholdTask(event)" class="task-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="taskName">Name der Hausarbeit:</label>
+                                    <input type="text" id="taskName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="taskHours">Stunden:</label>
+                                    <input type="number" id="taskHours" step="0.25" min="0" max="24" required>
+                                </div>
+                                <div class="form-group">
+                                    <button type="submit" class="btn btn-success">Hinzufügen</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Tasks List -->
+                    <div class="tasks-list-container">
+                        <h4>Vorhandene Hausarbeiten</h4>
+                        <div id="adminTasksList" class="admin-tasks-list">
+                            <!-- Tasks will be loaded here -->
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Legacy Admin Functions -->
@@ -196,6 +257,27 @@
                 <div class="modal-actions">
                     <button type="submit" class="btn btn-primary">Passwort ändern</button>
                     <button type="button" onclick="closeChangePasswordModal()" class="btn btn-secondary">Abbrechen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Household Task Modal -->
+    <div id="editTaskModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Hausarbeit bearbeiten</h3>
+            <form onsubmit="saveEditedTask(event)">
+                <div class="form-group">
+                    <label for="editTaskName">Name der Hausarbeit:</label>
+                    <input type="text" id="editTaskName" required>
+                </div>
+                <div class="form-group">
+                    <label for="editTaskHours">Zeitgutschrift (Stunden):</label>
+                    <input type="number" id="editTaskHours" step="0.25" min="0" max="24" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Änderungen speichern</button>
+                    <button type="button" onclick="closeEditTaskModal()" class="btn btn-secondary">Abbrechen</button>
                 </div>
             </form>
         </div>

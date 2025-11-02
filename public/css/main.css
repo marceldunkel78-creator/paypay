@@ -165,6 +165,7 @@ header h1 {
     padding: 30px;
     border-radius: 10px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
 }
 
 .section h2 {
@@ -330,6 +331,118 @@ header h1 {
     color: #5a67d8;
 }
 
+/* Task Selection Styles */
+.task-hours-display {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.9em;
+    color: #666;
+    font-style: italic;
+}
+
+.form-group select option:disabled {
+    color: #999;
+}
+
+/* Admin Household Tasks Management */
+.admin-household-tasks {
+    margin-top: 30px;
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.task-form-container {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.task-form .form-row {
+    display: flex;
+    gap: 15px;
+    align-items: end;
+}
+
+.task-form .form-group {
+    flex: 1;
+}
+
+.task-form .form-group:last-child {
+    flex: 0;
+}
+
+.tasks-list-container {
+    margin-top: 20px;
+}
+
+.admin-tasks-list {
+    display: grid;
+    gap: 10px;
+}
+
+.task-item {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 15px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    transition: box-shadow 0.2s;
+}
+
+.task-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.task-info {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.task-name {
+    font-weight: 600;
+    color: #1a202c;
+}
+
+.task-hours {
+    color: #10b981;
+    font-weight: 500;
+}
+
+.task-status {
+    font-size: 0.9em;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.task-status.active {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.task-status.inactive {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.task-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 15px;
+}
+
+.task-actions .btn {
+    padding: 5px 10px;
+    font-size: 0.9em;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
@@ -349,4 +462,51 @@ header h1 {
     .request-actions {
         flex-direction: column;
     }
+}
+
+/* Section Header Styles */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.section-header h3 {
+    margin: 0;
+    color: #2d3748;
+}
+
+.section-header .btn {
+    margin-left: auto;
+}
+
+/* Radio Group Styles */
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+.radio-label input[type="radio"] {
+    margin-right: 8px;
+}
+
+/* Manual Time Input Styles */
+.manual-hours-display {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.9em;
+    color: #666;
+    font-style: italic;
 }
