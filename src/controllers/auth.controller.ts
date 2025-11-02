@@ -11,16 +11,23 @@ export class AuthController {
     public async register(req: Request, res: Response): Promise<void> {
         try {
             console.log('Register request received:', req.body);
-            const { username, password } = req.body;
+            const { username, email, password } = req.body;
             
-            if (!username || !password) {
-                res.status(400).json({ message: 'Username and password are required' });
+            if (!username || !email || !password) {
+                res.status(400).json({ message: 'Username, email and password are required' });
                 return;
             }
             
-            const user = await this.authService.register(username, password);
-            console.log('User registered successfully:', { id: user.id, username: user.username });
-            res.status(201).json({ id: user.id, username: user.username, role: user.role });
+            // Basic email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                res.status(400).json({ message: 'Invalid email format' });
+                return;
+            }
+            
+            const user = await this.authService.register(username, email, password);
+            console.log('User registered successfully:', { id: user.id, username: user.username, email: user.email });
+            res.status(201).json({ id: user.id, username: user.username, email: user.email, role: user.role });
         } catch (error) {
             console.error('Registration error:', error);
             const errorMessage = error instanceof Error ? error.message : 'Registration failed';

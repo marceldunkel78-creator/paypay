@@ -4,9 +4,9 @@ import jwt from 'jsonwebtoken';
 import { connectToDatabase } from '../db/index';
 
 export class AuthService {
-    async register(username: string, password: string): Promise<User> {
+    async register(username: string, email: string, password: string): Promise<User> {
         try {
-            console.log('AuthService.register called with username:', username);
+            console.log('AuthService.register called with username:', username, 'email:', email);
             
             // Check if user already exists
             const existingUser = await this.getUserByUsername(username);
@@ -14,12 +14,18 @@ export class AuthService {
                 throw new Error('Username already exists');
             }
             
+            // Check if email already exists
+            const existingEmail = await this.getUserByEmail(email);
+            if (existingEmail) {
+                throw new Error('Email already exists');
+            }
+            
             const hashedPassword = await bcrypt.hash(password, 10);
             const connection = await connectToDatabase();
             
             const [result] = await connection.execute(
-                'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-                [username, hashedPassword, 'user']
+                'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+                [username, email, hashedPassword, 'user']
             );
             
             const insertResult = result as any;
@@ -28,6 +34,7 @@ export class AuthService {
             return {
                 id: insertResult.insertId,
                 username,
+                email,
                 password: hashedPassword,
                 role: 'user'
             };
@@ -123,6 +130,22 @@ export class AuthService {
         } catch (error) {
             console.error('Error changing password:', error);
             throw error;
+        }
+    }
+
+    async getUserByEmail(email: string): Promise<User | null> {
+        try {
+            const connection = await connectToDatabase();
+            const [rows] = await connection.execute(
+                'SELECT * FROM users WHERE email = ?',
+                [email]
+            );
+            
+            const users = rows as User[];
+            return users.length > 0 ? users[0] : null;
+        } catch (error) {
+            console.error('Error fetching user by email:', error);
+            return null;
         }
     }
 }

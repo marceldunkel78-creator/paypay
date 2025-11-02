@@ -19,6 +19,7 @@ const migrate_timeentries_1 = require("./db/migrate-timeentries");
 const migrate_approval_1 = require("./db/migrate-approval");
 const migrate_household_tasks_1 = require("./db/migrate-household-tasks");
 const migrate_timeentries_task_id_1 = require("./db/migrate-timeentries-task-id");
+const migrate_user_email_1 = require("./db/migrate-user-email");
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const timeaccount_routes_1 = __importDefault(require("./routes/timeaccount.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
@@ -34,6 +35,15 @@ app.use(express_1.default.static('public'));
 // Public routes (no password protection)
 app.get('/', (req, res) => {
     res.sendFile('index.html', { root: 'public' });
+});
+// Health check endpoint for Docker
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        version: '1.0.0'
+    });
 });
 // API info endpoint  
 app.get('/api', (req, res) => {
@@ -77,6 +87,8 @@ app.use('/api/admin', password_protect_middleware_1.passwordProtect, admin_route
     yield (0, migrate_household_tasks_1.migrateHouseholdTasks)();
     // Run time entries task_id migration
     yield (0, migrate_timeentries_task_id_1.migrateTimeEntriesTaskId)();
+    // Run user email migration
+    yield (0, migrate_user_email_1.migrateUserEmail)();
 }))
     .catch((error) => {
     console.error('Database connection failed:', error);

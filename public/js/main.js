@@ -30,6 +30,7 @@ async function register(event) {
     event.preventDefault();
     
     const username = document.getElementById('registerUsername').value;
+    const email = document.getElementById('registerEmail').value;
     const password = document.getElementById('registerPassword').value;
     
     try {
@@ -38,7 +39,7 @@ async function register(event) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, email, password })
         });
         
         const data = await response.json();
@@ -48,6 +49,7 @@ async function register(event) {
             showLogin();
             // Reset the form properly
             document.getElementById('registerUsername').value = '';
+            document.getElementById('registerEmail').value = '';
             document.getElementById('registerPassword').value = '';
         } else {
             showMessage(data.message || 'Registrierung fehlgeschlagen', 'error');

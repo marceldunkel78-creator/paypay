@@ -17,23 +17,29 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const index_1 = require("../db/index");
 class AuthService {
-    register(username, password) {
+    register(username, email, password) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                console.log('AuthService.register called with username:', username);
+                console.log('AuthService.register called with username:', username, 'email:', email);
                 // Check if user already exists
                 const existingUser = yield this.getUserByUsername(username);
                 if (existingUser) {
                     throw new Error('Username already exists');
                 }
+                // Check if email already exists
+                const existingEmail = yield this.getUserByEmail(email);
+                if (existingEmail) {
+                    throw new Error('Email already exists');
+                }
                 const hashedPassword = yield bcrypt_1.default.hash(password, 10);
                 const connection = yield (0, index_1.connectToDatabase)();
-                const [result] = yield connection.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, hashedPassword, 'user']);
+                const [result] = yield connection.execute('INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)', [username, email, hashedPassword, 'user']);
                 const insertResult = result;
                 console.log('User inserted with ID:', insertResult.insertId);
                 return {
                     id: insertResult.insertId,
                     username,
+                    email,
                     password: hashedPassword,
                     role: 'user'
                 };
@@ -110,6 +116,20 @@ class AuthService {
             catch (error) {
                 console.error('Error changing password:', error);
                 throw error;
+            }
+        });
+    }
+    getUserByEmail(email) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const connection = yield (0, index_1.connectToDatabase)();
+                const [rows] = yield connection.execute('SELECT * FROM users WHERE email = ?', [email]);
+                const users = rows;
+                return users.length > 0 ? users[0] : null;
+            }
+            catch (error) {
+                console.error('Error fetching user by email:', error);
+                return null;
             }
         });
     }

@@ -5,6 +5,7 @@ import { migrateTimeEntries } from './db/migrate-timeentries';
 import { migrateApprovalSystem } from './db/migrate-approval';
 import { migrateHouseholdTasks } from './db/migrate-household-tasks';
 import { migrateTimeEntriesTaskId } from './db/migrate-timeentries-task-id';
+import { migrateUserEmail } from './db/migrate-user-email';
 import authRoutes from './routes/auth.routes';
 import timeAccountRoutes from './routes/timeaccount.routes';
 import adminRoutes from './routes/admin.routes';
@@ -82,6 +83,8 @@ connectToDatabase()
     await migrateHouseholdTasks();
     // Run time entries task_id migration
     await migrateTimeEntriesTaskId();
+    // Run user email migration
+    await migrateUserEmail();
   })
   .catch((error) => {
     console.error('Database connection failed:', error);

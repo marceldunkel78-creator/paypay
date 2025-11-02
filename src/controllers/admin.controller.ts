@@ -22,7 +22,19 @@ export class AdminController {
             }
 
             await this.timeAccountService.approveRequest(parseInt(requestId));
-            await this.emailService.sendApprovalConfirmation(request.userEmail);
+            
+            // Send email notification if email is configured
+            try {
+                if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+                    await this.emailService.sendApprovalConfirmation(request.userEmail);
+                    console.log(`Approval notification sent to ${request.userEmail}`);
+                } else {
+                    console.log('Email not configured - skipping notification');
+                }
+            } catch (emailError) {
+                console.warn('Failed to send email notification:', emailError);
+                // Continue without failing the request
+            }
 
             res.status(200).send('Request approved and user notified');
         } catch (error) {
@@ -41,7 +53,19 @@ export class AdminController {
             }
 
             await this.timeAccountService.rejectRequest(parseInt(requestId));
-            await this.emailService.sendRejectionNotification(request.userEmail);
+            
+            // Send email notification if email is configured
+            try {
+                if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+                    await this.emailService.sendRejectionNotification(request.userEmail);
+                    console.log(`Rejection notification sent to ${request.userEmail}`);
+                } else {
+                    console.log('Email not configured - skipping notification');
+                }
+            } catch (emailError) {
+                console.warn('Failed to send email notification:', emailError);
+                // Continue without failing the request
+            }
 
             res.status(200).send('Request rejected and user notified');
         } catch (error) {

@@ -27,7 +27,20 @@ class AdminController {
                     return;
                 }
                 yield this.timeAccountService.approveRequest(parseInt(requestId));
-                yield this.emailService.sendApprovalConfirmation(request.userEmail);
+                // Send email notification if email is configured
+                try {
+                    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+                        yield this.emailService.sendApprovalConfirmation(request.userEmail);
+                        console.log(`Approval notification sent to ${request.userEmail}`);
+                    }
+                    else {
+                        console.log('Email not configured - skipping notification');
+                    }
+                }
+                catch (emailError) {
+                    console.warn('Failed to send email notification:', emailError);
+                    // Continue without failing the request
+                }
                 res.status(200).send('Request approved and user notified');
             }
             catch (error) {
@@ -45,7 +58,20 @@ class AdminController {
                     return;
                 }
                 yield this.timeAccountService.rejectRequest(parseInt(requestId));
-                yield this.emailService.sendRejectionNotification(request.userEmail);
+                // Send email notification if email is configured
+                try {
+                    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+                        yield this.emailService.sendRejectionNotification(request.userEmail);
+                        console.log(`Rejection notification sent to ${request.userEmail}`);
+                    }
+                    else {
+                        console.log('Email not configured - skipping notification');
+                    }
+                }
+                catch (emailError) {
+                    console.warn('Failed to send email notification:', emailError);
+                    // Continue without failing the request
+                }
                 res.status(200).send('Request rejected and user notified');
             }
             catch (error) {

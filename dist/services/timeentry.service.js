@@ -276,18 +276,21 @@ class TimeEntryService {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
-                // Zuerst den Eintrag abrufen um die Stunden zu bekommen
+                // Zuerst den Eintrag abrufen um die Stunden und Benutzer-E-Mail zu bekommen
                 const selectQuery = `
-                SELECT user_id, hours FROM time_entries 
-                WHERE id = ? AND status = 'pending'
+                SELECT te.user_id, te.hours, u.username as userEmail 
+                FROM time_entries te 
+                JOIN users u ON te.user_id = u.id
+                WHERE te.id = ? AND te.status = 'pending'
             `;
                 const [entries] = yield db.execute(selectQuery, [entryId]);
                 if (entries.length === 0) {
-                    return false; // Eintrag nicht gefunden oder bereits bearbeitet
+                    return { success: false }; // Eintrag nicht gefunden oder bereits bearbeitet
                 }
                 const entry = entries[0];
                 const userId = entry.user_id;
                 const hours = parseFloat(entry.hours);
+                const userEmail = entry.userEmail;
                 // Eintrag auf genehmigt setzen
                 const updateQuery = `
                 UPDATE time_entries 
@@ -298,9 +301,9 @@ class TimeEntryService {
                 if (result.affectedRows > 0) {
                     // Balance aktualisieren
                     yield this.updateUserBalance(userId, hours);
-                    return true;
+                    return { success: true, userEmail };
                 }
-                return false;
+                return { success: false };
             }
             catch (error) {
                 console.error('Error approving time entry:', error);
@@ -445,6 +448,26 @@ class TimeEntryService {
             catch (error) {
                 console.error('Error deleting time entry (admin):', error);
                 throw new Error('Failed to delete time entry');
+            }
+        });
+    }
+    // Get user details by ID
+    getUserById(userId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const db = yield (0, db_1.connectToDatabase)();
+                const [rows] = yield db.execute('SELECT username, email FROM users WHERE id = ?', [userId]);
+                if (rows.length === 0) {
+                    return null;
+                }
+                return {
+                    username: rows[0].username,
+                    email: rows[0].email
+                };
+            }
+            catch (error) {
+                console.error('Error fetching user by ID:', error);
+                return null;
             }
         });
     }

@@ -17,16 +17,26 @@ const nodemailer_1 = __importDefault(require("nodemailer"));
 const default_1 = __importDefault(require("../config/default"));
 class EmailService {
     constructor() {
-        this.transporter = nodemailer_1.default.createTransport({
-            service: default_1.default.email.service,
-            auth: {
-                user: default_1.default.email.user,
-                pass: default_1.default.email.password,
-            },
-        });
+        this.isConfigured = !!(default_1.default.email.user && default_1.default.email.password);
+        if (this.isConfigured) {
+            this.transporter = nodemailer_1.default.createTransport({
+                service: default_1.default.email.service,
+                auth: {
+                    user: default_1.default.email.user,
+                    pass: default_1.default.email.password,
+                },
+            });
+        }
+        else {
+            console.warn('Email service not configured - email notifications will be skipped');
+        }
     }
     sendApprovalRequest(to, subject, html) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!this.isConfigured || !this.transporter) {
+                console.warn('Email service not configured - cannot send approval request');
+                return Promise.resolve();
+            }
             const mailOptions = {
                 from: default_1.default.email.from,
                 to,
@@ -38,6 +48,10 @@ class EmailService {
     }
     sendApprovalConfirmation(to, subject = 'Request Approved', html = 'Your time account request has been approved.') {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!this.isConfigured || !this.transporter) {
+                console.warn('Email service not configured - cannot send approval confirmation');
+                return Promise.resolve();
+            }
             const mailOptions = {
                 from: default_1.default.email.from,
                 to,
@@ -49,6 +63,10 @@ class EmailService {
     }
     sendRejectionNotification(to, subject = 'Request Rejected', html = 'Your time account request has been rejected.') {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!this.isConfigured || !this.transporter) {
+                console.warn('Email service not configured - cannot send rejection notification');
+                return Promise.resolve();
+            }
             const mailOptions = {
                 from: default_1.default.email.from,
                 to,
