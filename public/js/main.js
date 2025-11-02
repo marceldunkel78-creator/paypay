@@ -1,5 +1,5 @@
-// API Configuration
-const API_BASE = 'http://localhost:3000/api';
+// API Configuration - Dynamic base URL to work from any device
+const API_BASE = `http://${window.location.hostname}:3000/api`;
 let currentUser = null;
 let authToken = null;
 let userTimeBalance = 0;
