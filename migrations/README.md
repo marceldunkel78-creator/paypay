@@ -1,35 +1,74 @@
 # Database Migrations
 
-This directory contains SQL migration files for the Time Account Management application.
+This directory contains SQL migration files for the PayPay application database.
 
-## Migration Order
+## 🚀 Quick Setup Options
 
-Migrations should be executed in the following order:
-
-1. **001-init.sql** - Initial database setup with users and time_accounts tables
-2. **002-time-entries.sql** - Individual time entries system with balance tracking
-3. **003-approval-system.sql** - Approval workflow enhancements
-4. **004-household-tasks.sql** - Household tasks management system
-5. **005-time-entries-task-id.sql** - Link time entries to household tasks
-
-## Automatic Migration
-
-The application automatically runs these migrations on startup through the TypeScript migration scripts in `src/db/migrate-*.ts`.
-
-## Manual Migration
-
-You can also run migrations manually using:
+### For Fresh Installations (Recommended)
+Use the complete setup file that contains everything in one place:
 
 ```bash
-# Windows
+# Fresh installation - drops existing tables and recreates everything
+mysql -u paypay -p time_account_db < complete-setup.sql
+```
+
+### For Existing Installations  
+Use the incremental update that safely adds missing components:
+
+```bash
+# Update existing installation - preserves data
+mysql -u paypay -p time_account_db < incremental-update.sql
+```
+
+## 📁 Migration Files
+
+### 🆕 Unified Migration Files
+- **`complete-setup.sql`** - Complete database setup for fresh installations
+- **`incremental-update.sql`** - Safe updates for existing installations
+
+### 📊 Individual Migration Files (Legacy)
+- `001-init.sql` - Core tables (users, time_accounts)
+- `002-time-entries.sql` - Time entries table (without task_id)  
+- `003-approval-system.sql` - Approval workflow extensions
+- `004-household-tasks.sql` - Household tasks table
+- `005-time-entries-task-id.sql` - Links time entries to household tasks
+- `run-migrations-in-order.sql` - Executes individual files in correct order
+
+## ✅ What's Included
+
+The complete setup includes:
+- ✅ **User Management**: Registration, approval workflow, email notifications
+- ✅ **Time Tracking**: Individual time entries with positive/negative values
+- ✅ **Household Tasks**: Predefined tasks with fixed time rewards  
+- ✅ **Approval System**: Admin approval for time entries
+- ✅ **Balance Tracking**: Automatic balance calculation with triggers
+- ✅ **Database Integrity**: Foreign key constraints and indexes
+
+## 🔧 Manual Migration (Development)
+
+For development, you can still run individual migrations:
+
+```bash
+# Windows  
 npm run migrate
 
 # Unix/Linux
 npm run migrate:unix
 ```
 
-## Notes
+## 🔍 Database Schema Overview
 
-- All migrations are designed to be idempotent (safe to run multiple times)
-- The application will automatically detect and run any pending migrations
-- Database schema changes should always be done through migrations
+```
+users (id, username, password, email, role, is_approved)
+├── time_accounts (user_id FK)
+├── time_entries (user_id FK, task_id FK, approved_by FK)
+│   └── household_tasks (task_id FK)
+└── user_time_balance (user_id FK)
+```
+
+## ⚠️ Important Notes
+
+- **Fresh installations**: Use `complete-setup.sql` - it's faster and cleaner
+- **Existing databases**: Use `incremental-update.sql` - it preserves your data
+- **Development**: Individual migration files are still available for testing
+- **Production**: Always backup your database before running migrations

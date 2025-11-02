@@ -4,6 +4,7 @@
 -- ==============================================
 
 -- Individual time entries table for tracking productive and screen time
+-- Note: task_id will be added in migration 005 after household_tasks table is created
 CREATE TABLE IF NOT EXISTS time_entries (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
