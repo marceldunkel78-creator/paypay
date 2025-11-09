@@ -66,13 +66,22 @@ else
     exit 1
 fi
 
+# Remember current directory (where git repo is)
+REPO_DIR=$(pwd)
+
 # Create application directory
 echo "Setting up application directory..."
 sudo mkdir -p /opt/paypay
 sudo chown $USER:$USER /opt/paypay
+
+# Copy application files to deployment directory
+echo "Copying application files..."
+cp -r $REPO_DIR/* /opt/paypay/
+cp -r $REPO_DIR/.* /opt/paypay/ 2>/dev/null || true  # Copy hidden files, ignore errors
+
+# Change to deployment directory
 cd /opt/paypay
 
-# Clone or copy application files (assuming files are already present)
 echo "Setting up application files..."
 
 # Create production environment file
@@ -197,7 +206,7 @@ echo "App user password: $MYSQL_PASSWORD"
 echo ""
 echo "Important next steps:"
 echo "1. Change the admin password immediately"
-echo "2. Configure email settings in .env.production"
+echo "2. Configure email settings in .env"
 echo "3. Set up regular backups"
 echo "4. Monitor system resources"
 echo ""
