@@ -49,8 +49,7 @@ DELETE t1 FROM household_tasks t1
 INNER JOIN household_tasks t2 
 WHERE t1.id > t2.id AND t1.name = t2.name;
 
--- Hours-Spalte hinzufügen (ignoriert Fehler falls bereits vorhanden)
-ALTER TABLE household_tasks ADD COLUMN hours DECIMAL(4, 2) DEFAULT 1.00 AFTER description;
+-- Hours-Spalte ist bereits in CREATE TABLE definiert, daher nicht nochmal hinzufügen
 
 -- Hours-Werte für bestehende Aufgaben setzen
 UPDATE household_tasks SET hours = 0.50 WHERE name = 'Küche aufräumen';
@@ -175,7 +174,7 @@ UPDATE household_tasks SET weight_factor = 1.25 WHERE name = 'Einkaufen';
 -- ====================================
 
 -- Charset und Collation für konsistente UTF-8 Unterstützung
-ALTER DATABASE paypay CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+-- ALTER DATABASE time_account_db CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- ====================================
 -- Migration erfolgreich abgeschlossen
@@ -185,5 +184,5 @@ ALTER DATABASE paypay CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 SELECT 'Migration completed successfully!' as status;
 SELECT TABLE_NAME, TABLE_ROWS 
 FROM information_schema.TABLES 
-WHERE TABLE_SCHEMA = 'paypay' 
+WHERE TABLE_SCHEMA = 'time_account_db' 
 ORDER BY TABLE_NAME;

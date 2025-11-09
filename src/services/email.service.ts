@@ -76,11 +76,12 @@ export class EmailService {
             return Promise.resolve();
         }
 
-        // Get admin emails from environment variables
+        // Get admin emails from environment variables (remove duplicates)
         const adminEmails = [
             process.env.ADMIN_EMAIL_1,
             process.env.ADMIN_EMAIL_2
-        ].filter(email => email && email.includes('@'));
+        ].filter(email => email && email.includes('@'))
+         .filter((email, index, array) => array.indexOf(email) === index); // Remove duplicates
 
         if (adminEmails.length === 0) {
             console.log('No valid admin emails configured for new user notification');
