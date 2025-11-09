@@ -26,18 +26,30 @@ echo "DB Password: $DB_PASSWORD"
 echo "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
-# Install Node.js 18
-echo "Installing Node.js..."
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# Install latest Node.js LTS (20.x)
+echo "Installing Node.js LTS..."
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
 sudo apt install -y nodejs
+
+# Update npm to latest version
+echo "Updating npm to latest version..."
+sudo npm install -g npm@latest
+
+# Verify versions
+echo "Node.js version: $(node --version)"
+echo "npm version: $(npm --version)"
 
 # Install MariaDB
 echo "Installing MariaDB..."
 sudo apt install -y mariadb-server mariadb-client
 
-# Install PM2 for process management
+# Install PM2 for process management (latest version)
 echo "Installing PM2..."
-sudo npm install -g pm2
+sudo npm install -g pm2@latest
+
+# Install TypeScript support for PM2
+echo "Installing TypeScript support..."
+sudo npm install -g ts-node typescript
 
 # Install additional packages
 sudo apt install -y nginx curl wget git
@@ -180,7 +192,19 @@ sudo systemctl enable nginx
 # Start application with PM2
 echo "Starting application..."
 pm2 delete paypay 2>/dev/null || true
-pm2 start src/server.ts --name paypay --interpreter-args="--require ts-node/register"
+
+# Check if we have TypeScript files or JavaScript files
+if [ -f "dist/server.js" ]; then
+    echo "Starting from compiled JavaScript..."
+    pm2 start dist/server.js --name paypay
+elif [ -f "src/server.ts" ]; then
+    echo "Starting TypeScript with ts-node..."
+    pm2 start src/server.ts --name paypay --interpreter-args="--require ts-node/register"
+else
+    echo "Starting from src/app.js..."
+    pm2 start src/app.js --name paypay
+fi
+
 pm2 save
 pm2 startup
 
