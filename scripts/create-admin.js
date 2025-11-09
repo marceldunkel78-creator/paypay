@@ -3,14 +3,50 @@ const bcrypt = require('bcrypt');
 const readline = require('readline');
 require('dotenv').config();
 
-// Database configuration using environment variables
-const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT) || 3306,
-    user: process.env.DB_USER || 'paypay',
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'time_account_db'
-};
+// Database configuration - use same logic as main application
+function getDatabaseConfig() {
+    const dbUrl = process.env.DATABASE_URL || '';
+    
+    if (dbUrl && dbUrl.startsWith('mysql://')) {
+        // Handle URL format like mysql://user:pass@host:port/database
+        try {
+            const url = new URL(dbUrl);
+            return {
+                host: url.hostname,
+                port: parseInt(url.port) || 3306,
+                user: url.username,
+                password: url.password || '',
+                database: url.pathname.slice(1), // Remove leading slash
+            };
+        } catch (urlError) {
+            console.warn('Failed to parse DATABASE_URL, falling back to manual parsing');
+            // Manual parsing for URLs without password
+            const match = dbUrl.match(/mysql:\/\/([^@]+)@([^:]+):(\d+)\/(.+)/);
+            if (match) {
+                return {
+                    host: match[2],
+                    port: parseInt(match[3]) || 3306,
+                    user: match[1],
+                    password: '', // No password in URL
+                    database: match[4],
+                };
+            } else {
+                throw new Error('Invalid DATABASE_URL format');
+            }
+        }
+    } else {
+        // Fallback to individual environment variables
+        return {
+            host: process.env.DB_HOST || 'localhost',
+            port: parseInt(process.env.DB_PORT || '3306'),
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'time_account_db',
+        };
+    }
+}
+
+const dbConfig = getDatabaseConfig();
 
 // Create readline interface for user input
 const rl = readline.createInterface({

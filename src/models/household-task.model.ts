@@ -1,7 +1,9 @@
 export interface HouseholdTask {
     id: number;
     name: string;
-    hours: number;
+    description?: string;
+    hours?: number | null;
+    weight_factor: number;
     is_active: boolean;
     created_at?: Date;
     updated_at?: Date;
@@ -9,12 +11,16 @@ export interface HouseholdTask {
 
 export interface CreateHouseholdTaskRequest {
     name: string;
-    hours: number;
+    description?: string;
+    hours?: number | null;
+    weight_factor?: number;
     is_active?: boolean;
 }
 
 export interface UpdateHouseholdTaskRequest {
     name?: string;
-    hours?: number;
+    description?: string;
+    hours?: number | null;
+    weight_factor?: number;
     is_active?: boolean;
 }

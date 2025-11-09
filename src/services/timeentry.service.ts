@@ -11,11 +11,12 @@ export class TimeEntryService {
     }
     
     // Neue Zeiterfassung erstellen (positiv oder negativ) - Status: pending
-    async createTimeEntry(timeEntry: Omit<TimeEntry, 'id' | 'created_at' | 'approved_at' | 'approved_by'>): Promise<TimeEntry & { task_name?: string }> {
+    async createTimeEntry(timeEntry: Omit<TimeEntry, 'id' | 'created_at'>): Promise<TimeEntry & { task_name?: string }> {
         try {
             const db = await connectToDatabase();
             
             let finalHours = timeEntry.hours;
+            let calculatedHours: number | null = null;
             let taskName: string | undefined;
             
             // Wenn task_id gegeben ist, Stunden aus Hausarbeiten-Tabelle laden
@@ -30,10 +31,23 @@ export class TimeEntryService {
                 
                 taskName = task.name; // Task-Name für die E-Mail speichern
                 
-                // Positive oder negative Stunden basierend auf entry_type
-                finalHours = timeEntry.entry_type === 'screen_time' ? -Math.abs(task.hours) : Math.abs(task.hours);
+                if (timeEntry.entry_type === 'productive' && timeEntry.input_minutes) {
+                    // Neue Weight Factor Berechnung für produktive Zeit
+                    const inputMinutes = timeEntry.input_minutes;
+                    const weightFactor = task.weight_factor;
+                    calculatedHours = (inputMinutes * weightFactor) / 60; // Konvertierung zu Stunden
+                    finalHours = calculatedHours;
+                } else if (timeEntry.entry_type === 'screen_time') {
+                    // Bildschirmzeit: verwende input_minutes mit weight_factor (als negative Stunden)
+                    const inputMinutes = timeEntry.input_minutes || 0;
+                    const weightFactor = task.weight_factor;
+                    calculatedHours = (inputMinutes * weightFactor) / 60;
+                    finalHours = -Math.abs(calculatedHours); // Negativ für Bildschirmzeit
+                } else {
+                    throw new Error('Ungültige Eingabe für task-basierte Zeiterfassung');
+                }
             } else {
-                // Für manuelle Eingaben: Stunden direkt verwenden (sollten bereits korrekt sein)
+                // Für manuelle Eingaben: Stunden direkt verwenden (nur für screen_time erlaubt)
                 finalHours = timeEntry.hours;
                 
                 // Validierung: Manuelle Eingaben sind nur für screen_time erlaubt
@@ -48,13 +62,21 @@ export class TimeEntryService {
             }
             
             const query = `
-                INSERT INTO time_entries (user_id, task_id, hours, entry_type, description, status)
-                VALUES (?, ?, ?, ?, ?, 'pending')
+                INSERT INTO time_entries (user_id, task_id, hours, entry_type, description, status, input_minutes, calculated_hours)
+                VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
             `;
             
             const [result] = await db.execute<ResultSetHeader>(
                 query,
-                [timeEntry.user_id, timeEntry.task_id || null, finalHours, timeEntry.entry_type, timeEntry.description || null]
+                [
+                    timeEntry.user_id, 
+                    timeEntry.task_id || null, 
+                    finalHours, 
+                    timeEntry.entry_type, 
+                    timeEntry.description || null,
+                    timeEntry.input_minutes || null,
+                    calculatedHours
+                ]
             );
 
             console.log('Time entry created (pending approval):', result.insertId);
@@ -66,6 +88,7 @@ export class TimeEntryService {
                 id: result.insertId,
                 ...timeEntry,
                 hours: finalHours,
+                calculated_hours: calculatedHours,
                 status: 'pending',
                 created_at: new Date(),
                 task_name: taskName
@@ -85,7 +108,8 @@ export class TimeEntryService {
             
             let query = `
                 SELECT te.id, te.user_id, te.task_id, te.hours, te.entry_type, te.description, 
-                       te.status, te.created_at, te.approved_at, te.approved_by,
+                       te.status, te.created_at,
+                       te.input_minutes, te.calculated_hours,
                        ht.name as task_name
                 FROM time_entries te
                 LEFT JOIN household_tasks ht ON te.task_id = ht.id
@@ -112,8 +136,9 @@ export class TimeEntryService {
                 description: row.description,
                 status: row.status,
                 created_at: new Date(row.created_at),
-                approved_at: row.approved_at ? new Date(row.approved_at) : undefined,
-                approved_by: row.approved_by,
+
+                input_minutes: row.input_minutes,
+                calculated_hours: row.calculated_hours ? parseFloat(row.calculated_hours) : null,
                 task_name: row.task_name // Name der Hausarbeit
             }));
         } catch (error) {
@@ -259,6 +284,26 @@ export class TimeEntryService {
         }
     }
 
+    // Admin cleanup - removes old entries WITHOUT updating balance
+    async adminCleanupOldEntries(): Promise<number> {
+        try {
+            const db = await connectToDatabase();
+            
+            // Delete old entries without affecting user balances
+            const deleteQuery = `
+                DELETE FROM time_entries 
+                WHERE created_at < DATE_SUB(NOW(), INTERVAL 1 WEEK)
+            `;
+            const [result] = await db.execute<ResultSetHeader>(deleteQuery);
+            
+            console.log(`Admin cleanup: removed ${result.affectedRows} old time entries (balance unchanged)`);
+            return result.affectedRows;
+        } catch (error) {
+            console.error('Error in admin cleanup:', error);
+            throw new Error('Failed to cleanup old entries');
+        }
+    }
+
     // Statistiken für Admin (nur für normale User, nicht Admins)
     async getTimeStatistics(): Promise<any> {
         try {
@@ -267,15 +312,16 @@ export class TimeEntryService {
                 SELECT 
                     u.id,
                     u.username,
-                    COALESCE(SUM(CASE WHEN te.status = 'approved' THEN te.hours ELSE 0 END), 0) as current_balance,
+                    COALESCE(utb.current_balance, 0) as current_balance,
                     COUNT(CASE WHEN te.created_at > DATE_SUB(NOW(), INTERVAL 1 WEEK) THEN te.id END) as total_entries,
                     COUNT(CASE WHEN te.status = 'pending' AND te.created_at > DATE_SUB(NOW(), INTERVAL 1 WEEK) THEN te.id END) as pending_entries,
                     SUM(CASE WHEN te.entry_type = 'productive' AND te.status = 'approved' THEN te.hours ELSE 0 END) as productive_hours,
                     SUM(CASE WHEN te.entry_type = 'screen_time' AND te.status = 'approved' THEN ABS(te.hours) ELSE 0 END) as screen_time_hours
                 FROM users u
-                LEFT JOIN time_entries te ON u.id = te.user_id
+                LEFT JOIN time_entries te ON u.id = te.user_id AND te.created_at > DATE_SUB(NOW(), INTERVAL 1 WEEK)
+                LEFT JOIN user_time_balance utb ON u.id = utb.user_id
                 WHERE u.role = 'user'
-                GROUP BY u.id, u.username
+                GROUP BY u.id, u.username, utb.current_balance
                 ORDER BY current_balance DESC
             `;
             
@@ -322,11 +368,11 @@ export class TimeEntryService {
             // Eintrag auf genehmigt setzen
             const updateQuery = `
                 UPDATE time_entries 
-                SET status = 'approved', approved_at = CURRENT_TIMESTAMP, approved_by = ?
+                SET status = 'approved'
                 WHERE id = ? AND status = 'pending'
             `;
             
-            const [result] = await db.execute<ResultSetHeader>(updateQuery, [adminUserId, entryId]);
+            const [result] = await db.execute<ResultSetHeader>(updateQuery, [entryId]);
             
             if (result.affectedRows > 0) {
                 // Balance aktualisieren
@@ -347,11 +393,11 @@ export class TimeEntryService {
             const db = await connectToDatabase();
             const query = `
                 UPDATE time_entries 
-                SET status = 'rejected', approved_at = CURRENT_TIMESTAMP, approved_by = ?
+                SET status = 'rejected'
                 WHERE id = ? AND status = 'pending'
             `;
             
-            const [result] = await db.execute<ResultSetHeader>(query, [adminUserId, entryId]);
+            const [result] = await db.execute<ResultSetHeader>(query, [entryId]);
             
             return result.affectedRows > 0;
         } catch (error) {
@@ -384,11 +430,11 @@ export class TimeEntryService {
             // Eintrag aktualisieren und genehmigen
             const updateQuery = `
                 UPDATE time_entries 
-                SET hours = ?, status = 'approved', approved_at = CURRENT_TIMESTAMP, approved_by = ?
+                SET hours = ?, status = 'approved'
                 WHERE id = ?
             `;
             
-            const [result] = await db.execute<ResultSetHeader>(updateQuery, [hours, adminUserId, entryId]);
+            const [result] = await db.execute<ResultSetHeader>(updateQuery, [hours, entryId]);
             
             if (result.affectedRows > 0) {
                 // Balance aktualisieren
@@ -410,13 +456,73 @@ export class TimeEntryService {
         }
     }
 
+    // Admin: Update time entry by minutes (for Weight Factor entries)
+    async updateTimeEntryByMinutes(entryId: number, inputMinutes: number, adminUserId: number): Promise<boolean> {
+        try {
+            const db = await connectToDatabase();
+            
+            // Zuerst den alten Eintrag und die zugehörige Hausarbeit abrufen
+            const selectQuery = `
+                SELECT te.user_id, te.hours, te.status, te.task_id, te.input_minutes, te.calculated_hours,
+                       ht.weight_factor
+                FROM time_entries te
+                LEFT JOIN household_tasks ht ON te.task_id = ht.id
+                WHERE te.id = ?
+            `;
+            const [entries] = await db.execute<RowDataPacket[]>(selectQuery, [entryId]);
+            
+            if (entries.length === 0) {
+                return false;
+            }
+            
+            const entry = entries[0];
+            const userId = entry.user_id;
+            const oldHours = parseFloat(entry.hours);
+            const oldStatus = entry.status;
+            const weightFactor = parseFloat(entry.weight_factor) || 1.0;
+            
+            // Neue Stunden basierend auf Minuten und Weight Factor berechnen
+            const calculatedHours = (inputMinutes * weightFactor) / 60;
+            
+            // Eintrag aktualisieren und genehmigen
+            const updateQuery = `
+                UPDATE time_entries 
+                SET input_minutes = ?, calculated_hours = ?, hours = ?, 
+                    status = 'approved'
+                WHERE id = ?
+            `;
+            
+            const [result] = await db.execute<ResultSetHeader>(updateQuery, [
+                inputMinutes, calculatedHours, calculatedHours, entryId
+            ]);
+            
+            if (result.affectedRows > 0) {
+                // Balance aktualisieren
+                if (oldStatus === 'approved') {
+                    // Wenn bereits genehmigt war, alte Stunden abziehen und neue hinzufügen
+                    const hoursDifference = calculatedHours - oldHours;
+                    await this.updateUserBalance(userId, hoursDifference);
+                } else {
+                    // Wenn noch nicht genehmigt war, nur neue Stunden hinzufügen
+                    await this.updateUserBalance(userId, calculatedHours);
+                }
+                return true;
+            }
+            
+            return false;
+        } catch (error) {
+            console.error('Error updating time entry by minutes:', error);
+            throw new Error('Failed to update time entry by minutes');
+        }
+    }
+
     // Admin: Alle wartenden Einträge abrufen
     async getPendingTimeEntries(): Promise<TimeEntry[]> {
         try {
             const db = await connectToDatabase();
             const query = `
                 SELECT te.id, te.user_id, te.task_id, te.hours, te.entry_type, te.description, 
-                       te.status, te.created_at,
+                       te.status, te.created_at, te.input_minutes, te.calculated_hours,
                        u.username,
                        ht.name as task_name
                 FROM time_entries te
@@ -438,6 +544,8 @@ export class TimeEntryService {
                 description: row.description,
                 status: row.status,
                 created_at: new Date(row.created_at),
+                input_minutes: row.input_minutes,
+                calculated_hours: row.calculated_hours ? parseFloat(row.calculated_hours) : null,
                 task_name: row.task_name
             } as any));
         } catch (error) {

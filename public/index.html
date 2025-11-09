@@ -79,6 +79,11 @@
                     <span class="balance-amount" id="currentBalance">0.00</span>
                     <span class="balance-unit">Stunden</span>
                 </div>
+                <div class="balance-actions">
+                    <button onclick="openTransferModal()" class="btn btn-gift">
+                        🎁 Zeit verschenken
+                    </button>
+                </div>
             </section>
 
             <!-- New Time Entry Creation -->
@@ -101,10 +106,17 @@
                             <option value="">-- Hausarbeit auswählen --</option>
                             <!-- Options will be loaded dynamically -->
                         </select>
-                        <small class="task-hours-display" id="taskHoursDisplay">Zeitwert wird angezeigt</small>
+                        <small class="task-info-display" id="taskInfoDisplay">Wählen Sie eine Hausarbeit aus</small>
                     </div>
 
-                    <!-- Manual Time Input -->
+                    <!-- Time Input for Productive Time -->
+                    <div id="productiveTimeGroup" class="form-group" style="display: none;">
+                        <label for="inputMinutes">Tatsächlich gearbeitete Zeit (Minuten):</label>
+                        <input type="number" id="inputMinutes" step="1" min="1" max="1440" placeholder="z.B. 25">
+                        <small class="calculation-display" id="calculationDisplay">Gutschrift wird berechnet</small>
+                    </div>
+
+                    <!-- Manual Time Input for Screen Time -->
                     <div id="manualTimeGroup" class="form-group" style="display: none;">
                         <label for="manualHours">Bildschirmzeit (Stunden):</label>
                         <input type="number" id="manualHours" step="0.25" min="0" max="24" placeholder="z.B. 2.5">
@@ -149,6 +161,21 @@
                 <button onclick="loadTimeAccounts()" class="btn btn-secondary">Aktualisieren</button>
                 <div id="timeAccountsList" class="time-accounts-list">
                     <!-- Time accounts will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Zeit Transfer Historie (nur für User, nicht für Admins) -->
+            <section id="userTransferSection" class="section" style="display: none;">
+                <h2>🎁 Zeit-Transfer Historie</h2>
+                <div class="transfer-history-header">
+                    <p class="section-description">Ihre gesendeten und empfangenen Zeit-Geschenke</p>
+                    <div class="transfer-history-actions">
+                        <button onclick="loadTransferHistory()" class="btn btn-secondary">Aktualisieren</button>
+                        <button onclick="resetTransferHistory()" class="btn btn-danger">Historie zurücksetzen</button>
+                    </div>
+                </div>
+                <div id="transferHistoryList" class="transfer-history-list">
+                    <!-- Transfer history will be loaded here -->
                 </div>
             </section>
 
@@ -233,8 +260,13 @@
                                     <input type="text" id="taskName" required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="taskHours">Stunden:</label>
+                                    <label for="taskHours">Referenz-Stunden:</label>
                                     <input type="number" id="taskHours" step="0.25" min="0" max="24" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="taskWeightFactor">Zeitgewichtung:</label>
+                                    <input type="number" id="taskWeightFactor" step="0.01" min="0.01" max="5.00" value="1.00" required>
+                                    <small class="form-help">Faktor zur Zeitberechnung (z.B. 1.2 = 20% mehr Zeit)</small>
                                 </div>
                                 <div class="form-group">
                                     <button type="submit" class="btn btn-success">Hinzufügen</button>
@@ -303,8 +335,13 @@
                     <input type="text" id="editTaskName" required>
                 </div>
                 <div class="form-group">
-                    <label for="editTaskHours">Zeitgutschrift (Stunden):</label>
+                    <label for="editTaskHours">Referenz-Stunden:</label>
                     <input type="number" id="editTaskHours" step="0.25" min="0" max="24" required>
+                </div>
+                <div class="form-group">
+                    <label for="editTaskWeightFactor">Zeitgewichtung:</label>
+                    <input type="number" id="editTaskWeightFactor" step="0.01" min="0.01" max="5.00" required>
+                    <small class="form-help">Faktor zur Zeitberechnung (z.B. 1.2 = 20% mehr Zeit)</small>
                 </div>
                 <div class="modal-actions">
                     <button type="submit" class="btn btn-primary">Änderungen speichern</button>
@@ -314,6 +351,123 @@
         </div>
     </div>
 
-    <script src="js/main.js"></script>
+    <!-- Adjust Balance Modal -->
+    <div id="adjustBalanceModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Zeitkonto anpassen</h3>
+            <div class="balance-info">
+                <div class="user-info-section">
+                    <strong>Benutzer:</strong> <span id="adjustBalanceUsername"></span>
+                </div>
+                <div class="current-balance-section">
+                    <strong>Aktueller Kontostand:</strong> 
+                    <span id="adjustBalanceCurrentBalance" class="balance-display"></span>
+                </div>
+            </div>
+            
+            <form onsubmit="submitBalanceAdjustment(event)">
+                <div class="form-group">
+                    <label for="newBalanceInput">Neuer Kontostand (in Stunden):</label>
+                    <input type="number" id="newBalanceInput" step="0.25" required 
+                           placeholder="z.B. 5.5 oder -2.25">
+                    <small class="form-help">
+                        Geben Sie den neuen Kontostand ein. Positive Werte für Guthaben, negative für Schulden.
+                    </small>
+                </div>
+                
+                <div class="balance-preview" id="balancePreview" style="display: none;">
+                    <div class="preview-item">
+                        <span class="preview-label">Vorher:</span>
+                        <span id="previewOldBalance" class="balance-display"></span>
+                    </div>
+                    <div class="preview-item">
+                        <span class="preview-label">Nachher:</span>
+                        <span id="previewNewBalance" class="balance-display"></span>
+                    </div>
+                    <div class="preview-item">
+                        <span class="preview-label">Änderung:</span>
+                        <span id="previewDifference" class="balance-display"></span>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-warning">Zeitkonto anpassen</button>
+                    <button type="button" onclick="closeAdjustBalanceModal()" class="btn btn-secondary">Abbrechen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Zeit Transfer Modal -->
+    <div id="transferHoursModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Zeit verschenken</h3>
+            <div class="balance-info">
+                <div class="current-balance-section">
+                    <strong>Ihr aktueller Kontostand:</strong> 
+                    <span id="transferCurrentBalance" class="balance-display">Lade...</span>
+                </div>
+            </div>
+            
+            <form onsubmit="submitHourTransfer(event)">
+                <div class="form-group">
+                    <label for="transferToUserSelect">Empfänger auswählen:</label>
+                    <select id="transferToUserSelect" required>
+                        <option value="">-- Benutzer auswählen --</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="transferHoursInput">Stunden verschenken:</label>
+                    <input type="number" id="transferHoursInput" step="0.25" min="0.25" required 
+                           placeholder="z.B. 2.5">
+                    <small class="form-help">
+                        Geben Sie die Anzahl Stunden ein, die Sie verschenken möchten.
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="transferReasonInput">Grund (optional):</label>
+                    <input type="text" id="transferReasonInput" 
+                           placeholder="z.B. Dankeschön für die Hilfe">
+                    <small class="form-help">
+                        Optional: Geben Sie einen Grund für die Übertragung an.
+                    </small>
+                </div>
+                
+                <div class="transfer-preview" id="transferPreview" style="display: none;">
+                    <div class="preview-item">
+                        <span class="preview-label">Sie verschenken:</span>
+                        <span id="transferPreviewHours" class="preview-value"></span>
+                    </div>
+                    <div class="preview-item">
+                        <span class="preview-label">Ihr neuer Kontostand:</span>
+                        <span id="transferPreviewNewBalance" class="preview-value"></span>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Zeit verschenken</button>
+                    <button type="button" onclick="closeTransferModal()" class="btn btn-secondary">Abbrechen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="confirmTitle">Bestätigung erforderlich</h3>
+            <div class="confirm-message">
+                <p id="confirmMessage">Sind Sie sicher?</p>
+            </div>
+            <div class="modal-actions">
+                <button id="confirmOkButton" class="btn btn-danger">Ja, löschen</button>
+                <button onclick="closeConfirmModal()" class="btn btn-secondary">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js?v=20241109-formatdate-fix"></script>
 </body>
 </html>

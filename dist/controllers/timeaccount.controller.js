@@ -83,5 +83,80 @@ class TimeAccountController {
             }
         });
     }
+    // Zeit an anderen User verschenken
+    transferHours(req, res) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { toUserId, hours, reason } = req.body;
+                const fromUserId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id; // aus auth middleware
+                console.log('Transfer request:', { fromUserId, toUserId, hours, reason });
+                if (!fromUserId) {
+                    res.status(401).json({ message: 'User not authenticated' });
+                    return;
+                }
+                if (!toUserId || !hours) {
+                    res.status(400).json({ message: 'Recipient user ID and hours are required' });
+                    return;
+                }
+                const success = yield this.timeAccountService.transferHoursToUser(parseInt(fromUserId), parseInt(toUserId), parseFloat(hours), reason);
+                if (success) {
+                    res.status(200).json({
+                        message: 'Hours transferred successfully',
+                        transfer: {
+                            fromUserId: parseInt(fromUserId),
+                            toUserId: parseInt(toUserId),
+                            hours: parseFloat(hours),
+                            reason: reason || 'Zeitübertragung'
+                        }
+                    });
+                }
+                else {
+                    res.status(400).json({ message: 'Failed to transfer hours' });
+                }
+            }
+            catch (error) {
+                console.error('Transfer error:', error);
+                res.status(400).json({
+                    message: error instanceof Error ? error.message : 'Error transferring hours'
+                });
+            }
+        });
+    }
+    // Aktuelle Balance abrufen
+    getUserBalance(req, res) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id; // aus auth middleware
+                console.log('Getting balance for user ID:', userId);
+                if (!userId) {
+                    res.status(401).json({ message: 'User not authenticated' });
+                    return;
+                }
+                const balance = yield this.timeAccountService.getUserBalance(parseInt(userId));
+                console.log('Retrieved balance:', balance);
+                res.status(200).json({ balance });
+            }
+            catch (error) {
+                console.error('Get balance error:', error);
+                res.status(500).json({ message: 'Error retrieving balance' });
+            }
+        });
+    }
+    // Transfer-Historie abrufen
+    getTransferHistory(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const userId = req.user.id; // aus auth middleware
+                const transfers = yield this.timeAccountService.getTransferHistory(parseInt(userId));
+                res.status(200).json(transfers);
+            }
+            catch (error) {
+                console.error('Get transfer history error:', error);
+                res.status(500).json({ message: 'Error retrieving transfer history' });
+            }
+        });
+    }
 }
 exports.TimeAccountController = TimeAccountController;

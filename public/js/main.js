@@ -131,6 +131,11 @@ function checkAuthStatus() {
         showMainApp();
         loadTimeBalance();
         loadTimeEntries();
+        
+        // Nur für normale User, nicht für Admins
+        if (currentUser.role !== 'admin') {
+            loadTransferHistory();
+        }
         // loadTimeAccounts(); // Legacy function - can be kept for compatibility
     } else {
         showAuthSection();
@@ -153,6 +158,10 @@ function showMainApp() {
     if (currentUser.role !== 'admin') {
         loadTimeBalance();
         loadTimeEntries();
+        // Transfer-Historie nur für normale User laden
+        if (currentUser.role !== 'admin') {
+            loadTransferHistory();
+        }
         loadHouseholdTasks(); // Hausarbeiten für Dropdown laden
         initializeTimeEntryForm(); // Initialisiere das Zeiterfassungs-Formular
     }
@@ -163,6 +172,7 @@ function showMainApp() {
         document.getElementById('timeEntrySection').style.display = 'none';
         document.getElementById('balanceSection').style.display = 'none';
         document.getElementById('timeEntriesSection').style.display = 'none';
+        document.getElementById('userTransferSection').style.display = 'none'; // Ausblenden für Admins
         loadAdminStatistics();
         loadPendingEntries();
         loadAdminHouseholdTasks(); // Hausarbeiten für Admin laden
@@ -171,6 +181,7 @@ function showMainApp() {
         document.getElementById('timeEntrySection').style.display = 'block';
         document.getElementById('balanceSection').style.display = 'block';
         document.getElementById('timeEntriesSection').style.display = 'block';
+        document.getElementById('userTransferSection').style.display = 'block';
     }
     
     // Set up auto-refresh every 30 seconds
@@ -182,6 +193,10 @@ function showMainApp() {
         } else {
             loadTimeBalance();
             loadTimeEntries();
+            // Transfer-Historie nur für normale User laden
+            if (currentUser.role !== 'admin') {
+                loadTransferHistory();
+            }
         }
     }, 30000);
 }
@@ -226,28 +241,33 @@ function populateHouseholdTaskDropdown() {
     // Clear existing options (except first placeholder)
     dropdown.innerHTML = '<option value="">-- Hausarbeit auswählen --</option>';
     
-    // Add household tasks (already sorted alphabetically from API)
+    // Add household tasks with weight factor information
     householdTasks.forEach(task => {
         const option = document.createElement('option');
         option.value = task.id;
-        option.textContent = `${task.name} (${task.hours}h)`;
+        option.textContent = `${task.name} (${task.hours}h, Faktor ${task.weight_factor})`;
         option.dataset.hours = task.hours;
+        option.dataset.weightFactor = task.weight_factor;
+        option.dataset.description = task.description || '';
         dropdown.appendChild(option);
     });
     
-    // Add event listener for hours display
-    dropdown.addEventListener('change', updateTaskHoursDisplay);
+    // Add event listeners
+    dropdown.addEventListener('change', updateTaskDisplay);
     
-    // Add event listener for entry type changes
     const entryTypeDropdown = document.getElementById('entryType');
     if (entryTypeDropdown) {
         entryTypeDropdown.addEventListener('change', toggleTimeEntryMode);
     }
     
-    // Add event listener for manual hours input
     const manualHoursInput = document.getElementById('manualHours');
     if (manualHoursInput) {
-        manualHoursInput.addEventListener('input', updateTaskHoursDisplay);
+        manualHoursInput.addEventListener('input', updateTaskDisplay);
+    }
+    
+    const inputMinutesInput = document.getElementById('inputMinutes');
+    if (inputMinutesInput) {
+        inputMinutesInput.addEventListener('input', updateCalculationDisplay);
     }
 }
 
@@ -255,30 +275,37 @@ function populateHouseholdTaskDropdown() {
 function toggleTimeEntryMode() {
     const entryType = document.getElementById('entryType').value;
     const householdTaskGroup = document.getElementById('householdTaskGroup');
+    const productiveTimeGroup = document.getElementById('productiveTimeGroup');
     const manualTimeGroup = document.getElementById('manualTimeGroup');
     const householdTaskSelect = document.getElementById('householdTask');
     
     if (entryType === 'screen_time') {
         // Bildschirmzeit: Manuelle Eingabe anzeigen, Hausarbeiten verstecken
         householdTaskGroup.style.display = 'none';
+        productiveTimeGroup.style.display = 'none';
         manualTimeGroup.style.display = 'block';
         householdTaskSelect.required = false;
         householdTaskSelect.value = ''; // Clear selection
+        
+        // Clear productive time inputs
+        const inputMinutes = document.getElementById('inputMinutes');
+        if (inputMinutes) inputMinutes.value = '';
     } else {
-        // Produktive Zeit: Hausarbeiten-Auswahl anzeigen, manuelle Eingabe verstecken
+        // Produktive Zeit: Hausarbeiten-Auswahl und Minuteneingabe anzeigen
         householdTaskGroup.style.display = 'block';
+        productiveTimeGroup.style.display = 'block';
         manualTimeGroup.style.display = 'none';
         householdTaskSelect.required = true;
+        
         // Clear manual input
         const manualHoursInput = document.getElementById('manualHours');
-        if (manualHoursInput) {
-            manualHoursInput.value = '';
-        }
+        if (manualHoursInput) manualHoursInput.value = '';
     }
-    updateTaskHoursDisplay();
+    updateTaskDisplay();
 }
 
-function updateTaskHoursDisplay() {
+// Updated function with new naming
+function updateTaskDisplay() {
     const entryType = document.getElementById('entryType').value;
     
     if (entryType === 'screen_time') {
@@ -298,24 +325,83 @@ function updateTaskHoursDisplay() {
     } else {
         // Handle household task selection display for productive time
         const dropdown = document.getElementById('householdTask');
-        const display = document.getElementById('taskHoursDisplay');
+        const display = document.getElementById('taskInfoDisplay');
         
         if (!dropdown || !display) return;
         
         const selectedOption = dropdown.options[dropdown.selectedIndex];
         
         if (selectedOption.value === '') {
-            display.textContent = 'Zeitwert wird angezeigt';
+            display.textContent = 'Wählen Sie eine Hausarbeit aus';
             display.style.color = '#666';
+            // Clear inputMinutes when no task is selected
+            const inputMinutes = document.getElementById('inputMinutes');
+            if (inputMinutes) {
+                inputMinutes.value = '';
+            }
         } else {
             const hours = parseFloat(selectedOption.dataset.hours);
-            display.textContent = `Zeitwert: +${hours}h`;
+            const weightFactor = parseFloat(selectedOption.dataset.weightFactor);
+            const description = selectedOption.dataset.description;
+            
+            display.innerHTML = `
+                <strong>Referenz:</strong> ${hours}h | <strong>Faktor:</strong> ${weightFactor}<br>
+                <em>${description}</em>
+            `;
             display.style.color = '#10b981';
+            
+            // Auto-fill inputMinutes with reference time converted to minutes
+            const inputMinutes = document.getElementById('inputMinutes');
+            if (inputMinutes && hours > 0) {
+                const referenceMinutes = Math.round(hours * 60);
+                inputMinutes.value = referenceMinutes;
+                
+                // Trigger calculation display update to show the new values
+                updateCalculationDisplay();
+            }
         }
+        
+        // Update calculation display
+        updateCalculationDisplay();
     }
 }
 
-// New Time Entry Functions
+// New function to update calculation display
+function updateCalculationDisplay() {
+    const entryType = document.getElementById('entryType').value;
+    if (entryType !== 'productive') return;
+    
+    const dropdown = document.getElementById('householdTask');
+    const inputMinutes = document.getElementById('inputMinutes');
+    const calculationDisplay = document.getElementById('calculationDisplay');
+    
+    if (!dropdown || !inputMinutes || !calculationDisplay) return;
+    
+    const selectedOption = dropdown.options[dropdown.selectedIndex];
+    const minutes = parseInt(inputMinutes.value);
+    
+    if (!selectedOption.value || !minutes || minutes <= 0) {
+        calculationDisplay.textContent = 'Gutschrift wird berechnet';
+        calculationDisplay.style.color = '#666';
+        return;
+    }
+    
+    const weightFactor = parseFloat(selectedOption.dataset.weightFactor);
+    const calculatedMinutes = Math.round(minutes * weightFactor);
+    const calculatedHours = (calculatedMinutes / 60).toFixed(2);
+    
+    calculationDisplay.innerHTML = `
+        <strong>${minutes} min × ${weightFactor} = ${calculatedMinutes} min (+${calculatedHours}h)</strong>
+    `;
+    calculationDisplay.style.color = '#10b981';
+}
+
+// Legacy function for backward compatibility
+function updateTaskHoursDisplay() {
+    updateTaskDisplay();
+}
+
+// New Time Entry Functions with Weight Factor Support
 async function createTimeEntry(event) {
     event.preventDefault();
     
@@ -323,14 +409,22 @@ async function createTimeEntry(event) {
     const description = document.getElementById('timeDescription').value;
     
     let taskId = null;
+    let inputMinutes = null;
     let manualHours = null;
     
     // Validate input based on entry type
     if (entryType === 'productive') {
-        // Productive time always requires a household task
+        // Productive time requires household task and minutes input
         taskId = document.getElementById('householdTask').value;
+        inputMinutes = parseInt(document.getElementById('inputMinutes').value);
+        
         if (!taskId) {
             showMessage('Bitte wählen Sie eine Hausarbeit aus', 'error');
+            return;
+        }
+        
+        if (!inputMinutes || inputMinutes <= 0) {
+            showMessage('Bitte geben Sie die tatsächlich gearbeiteten Minuten ein', 'error');
             return;
         }
     } else if (entryType === 'screen_time') {
@@ -348,8 +442,9 @@ async function createTimeEntry(event) {
             description: description
         };
         
-        if (taskId) {
+        if (taskId && inputMinutes) {
             requestBody.task_id = parseInt(taskId);
+            requestBody.input_minutes = inputMinutes;
         } else if (manualHours) {
             requestBody.hours = -manualHours; // Negative for screen time
         }
@@ -369,11 +464,12 @@ async function createTimeEntry(event) {
             showMessage('Zeiterfassung erstellt und wartet auf Genehmigung!', 'success');
             // Reset form
             document.getElementById('householdTask').value = '';
+            document.getElementById('inputMinutes').value = '';
             document.getElementById('timeDescription').value = '';
             document.getElementById('manualHours').value = '';
             document.getElementById('entryType').value = 'productive';
             toggleTimeEntryMode(); // Reset UI visibility
-            updateTaskHoursDisplay(); // Update display after reset
+            updateTaskDisplay(); // Update display after reset
             
             // Reload data
             loadTimeEntries();
@@ -389,18 +485,34 @@ async function createTimeEntry(event) {
 
 async function loadTimeBalance() {
     try {
-        const response = await fetch(`${API_BASE}/timeentries/balance`, {
+        // Verwende die neue timeaccount API für konsistente Balance-Werte
+        const response = await fetch(`${API_BASE}/timeaccount/balance`, {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
             }
         });
         
         if (response.ok) {
             const data = await response.json();
-            userTimeBalance = data.current_balance;
+            userTimeBalance = data.balance; // Neue API verwendet 'balance' statt 'current_balance'
             updateBalanceDisplay();
         } else {
-            console.error('Failed to load time balance');
+            // Fallback zur alten API falls neue nicht funktioniert
+            console.warn('New balance API failed, trying fallback...');
+            const fallbackResponse = await fetch(`${API_BASE}/timeentries/balance`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                }
+            });
+            
+            if (fallbackResponse.ok) {
+                const fallbackData = await fallbackResponse.json();
+                userTimeBalance = fallbackData.current_balance;
+                updateBalanceDisplay();
+            } else {
+                console.error('Both balance APIs failed');
+            }
         }
     } catch (error) {
         console.error('Error loading time balance:', error);
@@ -539,12 +651,15 @@ function displayAdminStatistics(statistics) {
         const balanceDisplay = stat.current_balance >= 0 ? `+${stat.current_balance.toFixed(2)}h` : `${stat.current_balance.toFixed(2)}h`;
         
         return `
-            <div class="user-stat-card" onclick="viewUserEntries(${stat.user_id}, '${stat.username}')">
+            <div class="user-stat-card">
                 <div class="user-stat-header">
-                    <h4>${stat.username}</h4>
-                    <span class="user-balance ${balanceClass}">${balanceDisplay}</span>
+                    <h4 onclick="viewUserEntries(${stat.user_id}, '${stat.username}')" style="cursor: pointer;">${stat.username}</h4>
+                    <div class="balance-controls">
+                        <span class="user-balance ${balanceClass}">${balanceDisplay}</span>
+                        <button data-user-id="${stat.user_id}" data-username="${stat.username}" data-balance="${stat.current_balance}" class="btn-adjust-balance" title="Zeitkonto anpassen">⚖️</button>
+                    </div>
                 </div>
-                <div class="user-stat-details">
+                <div class="user-stat-details" onclick="viewUserEntries(${stat.user_id}, '${stat.username}')" style="cursor: pointer;">
                     <div class="stat-item">
                         <span class="stat-label">Einträge (7 Tage):</span>
                         <span class="stat-value">${stat.total_entries}</span>
@@ -601,21 +716,31 @@ function displayPendingEntries(entries) {
         const date = new Date(entry.created_at).toLocaleDateString('de-DE');
         const time = new Date(entry.created_at).toLocaleTimeString('de-DE');
         const typeLabel = entry.entry_type === 'productive' ? 'Produktive Zeit' : 'Bildschirmzeit';
-        const hoursDisplay = entry.hours >= 0 ? `+${entry.hours}h` : `${entry.hours}h`;
+        
+        // Für Weight Factor Einträge: Minuten anzeigen, für andere: Stunden
+        let timeDisplay;
+        if (entry.input_minutes && entry.entry_type === 'productive') {
+            timeDisplay = `${entry.input_minutes} min`;
+        } else {
+            timeDisplay = entry.hours >= 0 ? `+${entry.hours}h` : `${entry.hours}h`;
+        }
         
         return `
             <div class="pending-entry">
                 <div class="pending-header">
                     <span class="pending-user">${entry.username}</span>
                     <span class="pending-type">${typeLabel}</span>
-                    <span class="pending-hours">${hoursDisplay}</span>
+                    <span class="pending-hours">${timeDisplay}</span>
                 </div>
                 <div class="pending-details">
-                    <p class="pending-description">${entry.description || 'Keine Beschreibung'}</p>
+                    <p class="pending-description">${formatEntryDescription(entry)}</p>
                     <small class="pending-timestamp">${date} um ${time}</small>
                 </div>
                 <div class="pending-actions">
-                    <input type="number" id="hours-${entry.id}" value="${entry.hours}" step="0.25" class="hours-input">
+                    ${entry.input_minutes && entry.entry_type === 'productive' ? 
+                        `<input type="number" id="minutes-${entry.id}" value="${entry.input_minutes}" step="1" min="1" class="minutes-input" placeholder="Minuten"> min` :
+                        `<input type="number" id="hours-${entry.id}" value="${entry.hours}" step="0.25" class="hours-input" placeholder="Stunden"> h`
+                    }
                     <button onclick="approveEntry(${entry.id})" class="btn btn-success">✓ Genehmigen</button>
                     <button onclick="rejectEntry(${entry.id})" class="btn btn-danger">✗ Ablehnen</button>
                     <button onclick="updateEntry(${entry.id})" class="btn btn-warning">📝 Ändern</button>
@@ -734,7 +859,7 @@ function generateUserEntriesHTML(entries) {
     }).join('');
 }
 
-// Format entry description with household task details
+// Format entry description with household task details and weight factor info
 function formatEntryDescription(entry) {
     let description = '';
     
@@ -742,9 +867,15 @@ function formatEntryDescription(entry) {
     if (entry.task_name) {
         description = entry.task_name;
         
-        // Add user description in parentheses if available
+        // Add weight factor calculation if available
+        if (entry.input_minutes && entry.calculated_hours) {
+            const calculatedHours = parseFloat(entry.calculated_hours).toFixed(2);
+            description += ` (${entry.input_minutes} min → +${calculatedHours}h)`;
+        }
+        
+        // Add user description if available
         if (entry.description && entry.description.trim()) {
-            description += ` (${entry.description.trim()})`;
+            description += ` - ${entry.description.trim()}`;
         }
     } else {
         // For manual entries or entries without task
@@ -867,11 +998,29 @@ async function rejectEntry(entryId) {
 }
 
 async function updateEntry(entryId) {
+    const minutesInput = document.getElementById(`minutes-${entryId}`);
     const hoursInput = document.getElementById(`hours-${entryId}`);
-    const newHours = parseFloat(hoursInput.value);
     
-    if (isNaN(newHours)) {
-        showMessage('Ungültige Stundenanzahl', 'error');
+    let requestBody;
+    
+    if (minutesInput) {
+        // Weight Factor Eintrag - Minuten verwenden
+        const newMinutes = parseInt(minutesInput.value);
+        if (isNaN(newMinutes) || newMinutes <= 0) {
+            showMessage('Ungültige Minutenanzahl', 'error');
+            return;
+        }
+        requestBody = { input_minutes: newMinutes };
+    } else if (hoursInput) {
+        // Legacy Eintrag - Stunden verwenden  
+        const newHours = parseFloat(hoursInput.value);
+        if (isNaN(newHours)) {
+            showMessage('Ungültige Stundenanzahl', 'error');
+            return;
+        }
+        requestBody = { hours: newHours };
+    } else {
+        showMessage('Eingabefeld nicht gefunden', 'error');
         return;
     }
     
@@ -882,7 +1031,7 @@ async function updateEntry(entryId) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`,
             },
-            body: JSON.stringify({ hours: newHours })
+            body: JSON.stringify(requestBody)
         });
         
         if (response.ok) {
@@ -898,11 +1047,19 @@ async function updateEntry(entryId) {
     }
 }
 
-async function cleanupOldEntries() {
-    if (!confirm('Möchten Sie wirklich alle Einträge älter als 1 Woche löschen?')) {
-        return;
-    }
-    
+function cleanupOldEntries() {
+    showConfirmModal(
+        'Alte Zeiteinträge bereinigen',
+        'Möchten Sie wirklich alle Zeiteinträge älter als 1 Woche löschen?\n\nDiese Einträge werden permanent entfernt, aber die Zeitbalance der Benutzer bleibt unverändert.',
+        async () => {
+            await performCleanupOldEntries();
+        },
+        false,
+        'cleanup'
+    );
+}
+
+async function performCleanupOldEntries() {
     try {
         const response = await fetch(`${API_BASE}/timeentries/admin/cleanup`, {
             method: 'POST',
@@ -913,7 +1070,7 @@ async function cleanupOldEntries() {
         
         if (response.ok) {
             const data = await response.json();
-            showMessage(`Bereinigung abgeschlossen: ${data.deletedEntries} Einträge gelöscht`, 'success');
+            showMessage(`Bereinigung abgeschlossen: ${data.deletedEntries} Einträge gelöscht (Zeitkontostände unverändert)`, 'success');
             loadAdminStatistics();
         } else {
             showMessage('Fehler bei der Bereinigung', 'error');
@@ -1176,11 +1333,18 @@ async function changePassword(event) {
 }
 
 // Admin Delete Function
-async function adminDeleteTimeEntry(entryId) {
-    if (!confirm('Sind Sie sicher, dass Sie diesen Zeiteintrag löschen möchten? Die Zeitbalance wird entsprechend aktualisiert.')) {
-        return;
-    }
-    
+function adminDeleteTimeEntry(entryId) {
+    showConfirmModal(
+        'Zeiteintrag löschen',
+        'Sind Sie sicher, dass Sie diesen Zeiteintrag löschen möchten?\nDie Zeitbalance wird entsprechend aktualisiert.',
+        async () => {
+            await performDeleteTimeEntry(entryId);
+        }
+    );
+}
+
+// Actual delete function
+async function performDeleteTimeEntry(entryId) {
     try {
         const response = await fetch(`${API_BASE}/timeentries/admin/delete/${entryId}`, {
             method: 'DELETE',
@@ -1294,6 +1458,7 @@ async function loadAdminHouseholdTasks() {
         
         if (response.ok) {
             const tasks = await response.json();
+            console.log('Loaded tasks with weight factors:', tasks.map(t => ({id: t.id, name: t.name, weight_factor: t.weight_factor})));
             displayAdminHouseholdTasks(tasks);
         } else {
             console.error('Failed to load household tasks');
@@ -1316,7 +1481,10 @@ function displayAdminHouseholdTasks(tasks) {
         <div class="task-item">
             <div class="task-info">
                 <h4>${task.name}</h4>
-                <span class="task-hours">${task.hours} Stunden</span>
+                <div class="task-details">
+                    <span class="task-hours">${task.hours} Std (Referenz)</span>
+                    <span class="task-weight-factor">Faktor: ${(task.weight_factor || 1.00).toFixed(2)}x</span>
+                </div>
                 <span class="task-status ${task.is_active ? 'active' : 'inactive'}">
                     ${task.is_active ? 'Aktiv' : 'Inaktiv'}
                 </span>
@@ -1341,9 +1509,11 @@ async function createHouseholdTask(event) {
     
     const nameInput = document.getElementById('taskName');
     const hoursInput = document.getElementById('taskHours');
+    const weightFactorInput = document.getElementById('taskWeightFactor');
     
     const name = nameInput.value.trim();
     const hours = parseFloat(hoursInput.value);
+    const weight_factor = parseFloat(weightFactorInput.value);
     
     if (!name) {
         showMessage('Bitte geben Sie einen Namen für die Hausarbeit ein', 'error');
@@ -1355,6 +1525,11 @@ async function createHouseholdTask(event) {
         return;
     }
     
+    if (!weight_factor || weight_factor <= 0 || weight_factor > 5) {
+        showMessage('Bitte geben Sie einen gültigen Zeitgewichtungsfaktor ein (0.01 - 5.00)', 'error');
+        return;
+    }
+    
     try {
         const response = await fetch(`${API_BASE}/household-tasks/admin/create`, {
             method: 'POST',
@@ -1362,7 +1537,7 @@ async function createHouseholdTask(event) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({ name, hours })
+            body: JSON.stringify({ name, hours, weight_factor })
         });
         
         const data = await response.json();
@@ -1371,6 +1546,7 @@ async function createHouseholdTask(event) {
             showMessage('Hausarbeit erfolgreich erstellt!', 'success');
             nameInput.value = '';
             hoursInput.value = '';
+            weightFactorInput.value = '1.00';
             loadAdminHouseholdTasks();
             
             // Auch das User-Dropdown aktualisieren falls vorhanden
@@ -1400,6 +1576,7 @@ async function editHouseholdTask(taskId) {
             // Modal mit aktuellen Werten füllen
             document.getElementById('editTaskName').value = task.name;
             document.getElementById('editTaskHours').value = task.hours;
+            document.getElementById('editTaskWeightFactor').value = task.weight_factor || 1.00;
             document.getElementById('editTaskModal').dataset.taskId = taskId;
             showEditTaskModal();
         } else {
@@ -1425,6 +1602,7 @@ async function saveEditedTask(event) {
     const taskId = document.getElementById('editTaskModal').dataset.taskId;
     const newName = document.getElementById('editTaskName').value.trim();
     const newHours = parseFloat(document.getElementById('editTaskHours').value);
+    const newWeightFactor = parseFloat(document.getElementById('editTaskWeightFactor').value);
     
     if (!newName) {
         showMessage('Bitte geben Sie einen Namen ein', 'error');
@@ -1433,6 +1611,11 @@ async function saveEditedTask(event) {
     
     if (!newHours || newHours <= 0) {
         showMessage('Bitte geben Sie eine gültige Stundenzahl ein', 'error');
+        return;
+    }
+    
+    if (!newWeightFactor || newWeightFactor <= 0 || newWeightFactor > 5) {
+        showMessage('Bitte geben Sie einen gültigen Zeitgewichtungsfaktor ein (0.01 - 5.00)', 'error');
         return;
     }
     
@@ -1445,7 +1628,8 @@ async function saveEditedTask(event) {
             },
             body: JSON.stringify({ 
                 name: newName, 
-                hours: newHours 
+                hours: newHours,
+                weight_factor: newWeightFactor
             })
         });
         
@@ -1494,10 +1678,17 @@ async function toggleHouseholdTaskStatus(taskId, newStatus) {
     }
 }
 
-async function deleteHouseholdTask(taskId) {
-    if (!confirm('Sind Sie sicher, dass Sie diese Hausarbeit löschen möchten?')) {
-        return;
-    }
+function deleteHouseholdTask(taskId) {
+    showConfirmModal(
+        'Hausarbeit löschen',
+        'Sind Sie sicher, dass Sie diese Hausarbeit löschen möchten?',
+        async () => {
+            await performDeleteHouseholdTask(taskId);
+        }
+    );
+}
+
+async function performDeleteHouseholdTask(taskId) {
     
     try {
         const response = await fetch(`${API_BASE}/household-tasks/admin/${taskId}`, {
@@ -1689,11 +1880,19 @@ async function activateUser(userId) {
     }
 }
 
-async function suspendUser(userId, username) {
-    if (!confirm(`Möchten Sie den Benutzer "${username}" wirklich sperren?`)) {
-        return;
-    }
-    
+function suspendUser(userId, username) {
+    showConfirmModal(
+        'Benutzer sperren',
+        `Möchten Sie den Benutzer "${username}" wirklich sperren?\n\nDer Benutzer kann sich danach nicht mehr anmelden.`,
+        async () => {
+            await performSuspendUser(userId, username);
+        },
+        false,
+        'suspend'
+    );
+}
+
+async function performSuspendUser(userId, username) {
     try {
         const response = await fetch(`${API_BASE}/admin/users/${userId}/suspend`, {
             method: 'POST',
@@ -1716,11 +1915,18 @@ async function suspendUser(userId, username) {
     }
 }
 
-async function deleteUser(userId, username) {
-    if (!confirm(`ACHTUNG: Möchten Sie den Benutzer "${username}" und ALLE seine Daten wirklich PERMANENT löschen? Diese Aktion kann nicht rückgängig gemacht werden!`)) {
-        return;
-    }
-    
+function deleteUser(userId, username) {
+    showConfirmModal(
+        'BENUTZER PERMANENT LÖSCHEN',
+        `ACHTUNG: Möchten Sie den Benutzer "${username}" und ALLE seine Daten wirklich PERMANENT löschen?\n\nDiese Aktion kann NICHT rückgängig gemacht werden!`,
+        async () => {
+            await performDeleteUser(userId, username);
+        },
+        true // isCritical = true
+    );
+}
+
+async function performDeleteUser(userId, username) {
     try {
         const response = await fetch(`${API_BASE}/admin/users/${userId}`, {
             method: 'DELETE',
@@ -1743,3 +1949,444 @@ async function deleteUser(userId, username) {
         showMessage('Fehler beim Löschen des Benutzers', 'error');
     }
 }
+
+// Balance Adjustment Management
+let adjustBalanceData = {};
+
+window.adjustUserBalance = function(userId, username, currentBalance) {
+    console.log('adjustUserBalance called with:', { userId, username, currentBalance });
+    
+    // Store data for modal
+    adjustBalanceData = {
+        userId: parseInt(userId),
+        username: username,
+        currentBalance: parseFloat(currentBalance)
+    };
+    
+    // Update modal content
+    document.getElementById('adjustBalanceUsername').textContent = username;
+    const currentBalanceSpan = document.getElementById('adjustBalanceCurrentBalance');
+    currentBalanceSpan.textContent = `${currentBalance.toFixed(2)} Stunden`;
+    currentBalanceSpan.className = 'balance-display ' + (currentBalance >= 0 ? 'positive' : 'negative');
+    
+    // Reset form
+    document.getElementById('newBalanceInput').value = currentBalance.toFixed(2);
+    document.getElementById('balancePreview').style.display = 'none';
+    
+    // Show modal
+    document.getElementById('adjustBalanceModal').style.display = 'block';
+};
+
+function closeAdjustBalanceModal() {
+    document.getElementById('adjustBalanceModal').style.display = 'none';
+    adjustBalanceData = {};
+}
+
+function updateBalancePreview() {
+    const newBalanceInput = document.getElementById('newBalanceInput');
+    const preview = document.getElementById('balancePreview');
+    
+    if (adjustBalanceData.currentBalance === undefined || !newBalanceInput.value) {
+        preview.style.display = 'none';
+        return;
+    }
+    
+    const newBalance = parseFloat(newBalanceInput.value);
+    if (isNaN(newBalance)) {
+        preview.style.display = 'none';
+        return;
+    }
+    
+    const oldBalance = adjustBalanceData.currentBalance;
+    const difference = newBalance - oldBalance;
+    
+    // Update preview elements
+    document.getElementById('previewOldBalance').textContent = `${oldBalance.toFixed(2)}h`;
+    document.getElementById('previewOldBalance').className = 'balance-display ' + (oldBalance >= 0 ? 'positive' : 'negative');
+    
+    document.getElementById('previewNewBalance').textContent = `${newBalance.toFixed(2)}h`;
+    document.getElementById('previewNewBalance').className = 'balance-display ' + (newBalance >= 0 ? 'positive' : 'negative');
+    
+    document.getElementById('previewDifference').textContent = `${difference >= 0 ? '+' : ''}${difference.toFixed(2)}h`;
+    document.getElementById('previewDifference').className = 'balance-display ' + (difference >= 0 ? 'positive' : 'negative');
+    
+    preview.style.display = 'block';
+}
+
+async function submitBalanceAdjustment(event) {
+    event.preventDefault();
+    
+    const newBalance = parseFloat(document.getElementById('newBalanceInput').value);
+    
+    if (isNaN(newBalance)) {
+        showMessage('Bitte geben Sie eine gültige Zahl ein', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/admin/users/${adjustBalanceData.userId}/balance`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ balance: newBalance })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showMessage(`Zeitkonto von ${adjustBalanceData.username} erfolgreich angepasst!`, 'success');
+            closeAdjustBalanceModal();
+            loadAdminStatistics(); // Statistiken aktualisieren
+        } else {
+            showMessage(data.error || 'Fehler beim Anpassen des Zeitkontos', 'error');
+        }
+    } catch (error) {
+        console.error('Error adjusting user balance:', error);
+        showMessage('Fehler beim Anpassen des Zeitkontos', 'error');
+    }
+}
+
+// Confirmation Modal Functions
+function showConfirmModal(title, message, onConfirm, isCritical = false, modalType = 'delete') {
+    const modal = document.getElementById('confirmModal');
+    const confirmButton = document.getElementById('confirmOkButton');
+    
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    
+    // Apply styling and button text based on type and criticality
+    if (isCritical) {
+        modal.classList.add('critical');
+        confirmButton.textContent = 'PERMANENT LÖSCHEN';
+        confirmButton.className = 'btn btn-danger';
+    } else {
+        modal.classList.remove('critical');
+        
+        // Set button text and style based on modal type
+        switch (modalType) {
+            case 'cleanup':
+                confirmButton.textContent = 'Ja, bereinigen';
+                confirmButton.className = 'btn btn-cleanup';
+                break;
+            case 'suspend':
+                confirmButton.textContent = 'Ja, sperren';
+                confirmButton.className = 'btn btn-suspend';
+                break;
+            case 'delete':
+            default:
+                confirmButton.textContent = 'Ja, löschen';
+                confirmButton.className = 'btn btn-danger';
+                break;
+        }
+    }
+    
+    // Remove existing event listeners
+    const newConfirmButton = confirmButton.cloneNode(true);
+    confirmButton.parentNode.replaceChild(newConfirmButton, confirmButton);
+    
+    // Add new event listener
+    newConfirmButton.addEventListener('click', async function() {
+        closeConfirmModal();
+        if (onConfirm) {
+            await onConfirm();
+        }
+    });
+    
+    modal.style.display = 'block';
+}
+
+function closeConfirmModal() {
+    const modal = document.getElementById('confirmModal');
+    modal.style.display = 'none';
+    modal.classList.remove('critical'); // Reset critical styling
+}
+
+// Weight Factor Management is now integrated into the main edit modal
+
+// Make functions globally accessible
+window.closeConfirmModal = closeConfirmModal;
+
+// Debug: Make sure adjustUserBalance is globally accessible
+console.log('adjustUserBalance function available:', typeof window.adjustUserBalance);
+
+// Event listener for balance adjustment buttons
+document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('btn-adjust-balance')) {
+        const userId = event.target.getAttribute('data-user-id');
+        const username = event.target.getAttribute('data-username');
+        const balance = parseFloat(event.target.getAttribute('data-balance'));
+        
+        console.log('Balance button clicked:', { userId, username, balance });
+        
+        if (userId && username && !isNaN(balance)) {
+            window.adjustUserBalance(userId, username, balance);
+        }
+    }
+});
+
+// Add input event listener for balance preview
+document.addEventListener('DOMContentLoaded', function() {
+    const newBalanceInput = document.getElementById('newBalanceInput');
+    if (newBalanceInput) {
+        newBalanceInput.addEventListener('input', updateBalancePreview);
+    }
+});
+
+// ================================
+// Zeit Transfer Funktionen
+// ================================
+
+async function openTransferModal() {
+    try {
+        // Modal öffnen
+        document.getElementById('transferHoursModal').style.display = 'block';
+        
+        // Aktuelle Balance laden
+        await loadCurrentBalance();
+        
+        // User-Liste laden
+        await loadUsersForTransfer();
+        
+        // Event Listener für Preview-Update
+        setupTransferPreview();
+        
+    } catch (error) {
+        console.error('Error opening transfer modal:', error);
+        showMessage('Fehler beim Öffnen des Transfer-Modals', 'error');
+    }
+}
+
+function closeTransferModal() {
+    document.getElementById('transferHoursModal').style.display = 'none';
+    // Form zurücksetzen
+    document.getElementById('transferToUserSelect').value = '';
+    document.getElementById('transferHoursInput').value = '';
+    document.getElementById('transferReasonInput').value = '';
+    document.getElementById('transferPreview').style.display = 'none';
+}
+
+async function loadCurrentBalance() {
+    try {
+        const response = await fetch(`${API_BASE}/timeaccount/balance`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('transferCurrentBalance').textContent = `${data.balance} Stunden`;
+            userTimeBalance = data.balance;
+        } else {
+            document.getElementById('transferCurrentBalance').textContent = 'Fehler beim Laden';
+        }
+    } catch (error) {
+        console.error('Error loading balance:', error);
+        document.getElementById('transferCurrentBalance').textContent = 'Fehler beim Laden';
+    }
+}
+
+async function loadUsersForTransfer() {
+    try {
+        const response = await fetch(`${API_BASE}/auth/users`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const users = await response.json();
+            const select = document.getElementById('transferToUserSelect');
+            
+            // Clear existing options (keep first placeholder option)
+            select.innerHTML = '<option value="">-- Benutzer auswählen --</option>';
+            
+            // Add users (exclude current user)
+            users.forEach(user => {
+                if (user.id !== currentUser.id) {
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.textContent = user.username;
+                    select.appendChild(option);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+        showMessage('Fehler beim Laden der Benutzerliste', 'error');
+    }
+}
+
+function setupTransferPreview() {
+    const hoursInput = document.getElementById('transferHoursInput');
+    const userSelect = document.getElementById('transferToUserSelect');
+    
+    const updatePreview = () => {
+        const hours = parseFloat(hoursInput.value) || 0;
+        const selectedUser = userSelect.value;
+        
+        if (hours > 0 && selectedUser) {
+            const newBalance = userTimeBalance - hours;
+            
+            document.getElementById('transferPreviewHours').textContent = `${hours} Stunden`;
+            document.getElementById('transferPreviewNewBalance').textContent = `${newBalance.toFixed(2)} Stunden`;
+            document.getElementById('transferPreview').style.display = 'block';
+        } else {
+            document.getElementById('transferPreview').style.display = 'none';
+        }
+    };
+    
+    hoursInput.addEventListener('input', updatePreview);
+    userSelect.addEventListener('change', updatePreview);
+}
+
+async function submitHourTransfer(event) {
+    event.preventDefault();
+    
+    const toUserId = document.getElementById('transferToUserSelect').value;
+    const hours = parseFloat(document.getElementById('transferHoursInput').value);
+    const reason = document.getElementById('transferReasonInput').value;
+    
+    if (!toUserId || !hours) {
+        showMessage('Bitte wählen Sie einen Empfänger und geben Sie die Stunden ein', 'error');
+        return;
+    }
+    
+    if (hours > userTimeBalance) {
+        showMessage(`Nicht genügend Guthaben. Ihr Kontostand: ${userTimeBalance} Stunden`, 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/timeaccount/transfer-hours`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                toUserId: parseInt(toUserId),
+                hours: hours,
+                reason: reason || undefined
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            const recipientName = document.getElementById('transferToUserSelect').selectedOptions[0].textContent;
+            showMessage(`Erfolgreich ${hours} Stunden an ${recipientName} verschenkt!`, 'success');
+            closeTransferModal();
+            
+            // Balance und Transfer-Historie aktualisieren
+            loadTimeBalance();
+            loadTransferHistory();
+        } else {
+            showMessage(data.message || 'Fehler beim Übertragen der Stunden', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error transferring hours:', error);
+        showMessage('Fehler beim Übertragen der Stunden', 'error');
+    }
+}
+
+async function loadTransferHistory() {
+    try {
+        const response = await fetch(`${API_BASE}/timeaccount/transfer-history`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const transfers = await response.json();
+            displayTransferHistory(transfers);
+        } else {
+            document.getElementById('transferHistoryList').innerHTML = '<p class="error-message">Fehler beim Laden der Transfer-Historie</p>';
+        }
+    } catch (error) {
+        console.error('Error loading transfer history:', error);
+        document.getElementById('transferHistoryList').innerHTML = '<p class="error-message">Fehler beim Laden der Transfer-Historie</p>';
+    }
+}
+
+function displayTransferHistory(transfers) {
+    const container = document.getElementById('transferHistoryList');
+    
+    if (transfers.length === 0) {
+        container.innerHTML = '<p class="no-data-message">Noch keine Zeit-Transfers getätigt</p>';
+        return;
+    }
+    
+    const transfersHTML = transfers.map(transfer => {
+        const isSent = transfer.type === 'sent';
+        const typeClass = isSent ? 'transfer-sent' : 'transfer-received';
+        const typeIcon = isSent ? '📤' : '📥';
+        const otherUser = isSent ? transfer.toUsername : transfer.fromUsername;
+        const actionText = isSent ? 'an' : 'von';
+        const hoursText = isSent ? `-${transfer.hours}` : `+${transfer.hours}`;
+        
+        return `
+            <div class="transfer-item ${typeClass}">
+                <div class="transfer-header">
+                    <span class="transfer-icon">${typeIcon}</span>
+                    <span class="transfer-action">
+                        <strong>${hoursText} Stunden</strong> ${actionText} <strong>${otherUser}</strong>
+                    </span>
+                    <span class="transfer-date">${new Date(transfer.createdAt).toLocaleDateString('de-DE')}</span>
+                </div>
+                ${transfer.reason ? `<div class="transfer-reason">"${transfer.reason}"</div>` : ''}
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = transfersHTML;
+}
+
+async function resetTransferHistory() {
+    if (!confirm('Sind Sie sicher, dass Sie Ihre komplette Transfer-Historie löschen möchten?\n\nDiese Aktion kann nicht rückgängig gemacht werden!')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/timeaccount/reset-transfer-history`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            showMessage('Transfer-Historie erfolgreich zurückgesetzt!', 'success');
+            loadTransferHistory(); // Historie neu laden (sollte jetzt leer sein)
+        } else {
+            const errorData = await response.json();
+            showMessage(errorData.message || 'Fehler beim Zurücksetzen der Transfer-Historie', 'error');
+        }
+    } catch (error) {
+        console.error('Error resetting transfer history:', error);
+        showMessage('Fehler beim Zurücksetzen der Transfer-Historie', 'error');
+    }
+}
+
+// Make modal functions globally accessible
+window.closeAdjustBalanceModal = closeAdjustBalanceModal;
+window.submitBalanceAdjustment = submitBalanceAdjustment;
+window.updateBalancePreview = updateBalancePreview;
+window.openTransferModal = openTransferModal;
+window.closeTransferModal = closeTransferModal;
+window.submitHourTransfer = submitHourTransfer;
+window.loadTransferHistory = loadTransferHistory;
+window.resetTransferHistory = resetTransferHistory;
+
+// Error handling for debugging
+window.addEventListener('error', function(event) {
+    console.error('JavaScript Error:', event.error);
+});

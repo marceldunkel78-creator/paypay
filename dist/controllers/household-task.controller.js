@@ -76,7 +76,7 @@ class HouseholdTaskController {
         var _a;
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { name, hours, is_active } = req.body;
+                const { name, hours, weight_factor, is_active } = req.body;
                 const user_role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
                 if (user_role !== 'admin') {
                     res.status(403).json({ error: 'Keine Berechtigung' });
@@ -93,6 +93,7 @@ class HouseholdTaskController {
                 const taskData = {
                     name: name.trim(),
                     hours: parseFloat(hours),
+                    weight_factor: weight_factor ? parseFloat(weight_factor) : 1.00,
                     is_active: is_active !== null && is_active !== void 0 ? is_active : true
                 };
                 const createdTask = yield this.householdTaskService.createHouseholdTask(taskData);
@@ -114,7 +115,7 @@ class HouseholdTaskController {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { id } = req.params;
-                const { name, hours, is_active } = req.body;
+                const { name, hours, weight_factor, is_active } = req.body;
                 const user_role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
                 if (user_role !== 'admin') {
                     res.status(403).json({ error: 'Keine Berechtigung' });
@@ -133,6 +134,9 @@ class HouseholdTaskController {
                 }
                 if (is_active !== undefined) {
                     updateData.is_active = Boolean(is_active);
+                }
+                if (weight_factor !== undefined) {
+                    updateData.weight_factor = parseFloat(weight_factor);
                 }
                 const success = yield this.householdTaskService.updateHouseholdTask(parseInt(id), updateData);
                 if (success) {

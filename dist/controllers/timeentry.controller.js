@@ -22,7 +22,7 @@ class TimeEntryController {
         var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { task_id, entry_type, description, hours } = req.body;
+                const { task_id, entry_type, description, hours, input_minutes } = req.body;
                 const user_id = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
                 const user_role = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
                 if (!user_id) {
@@ -42,20 +42,29 @@ class TimeEntryController {
                     res.status(400).json({ error: 'Ungültiger Eintragstyp' });
                     return;
                 }
-                // Validation: Either task_id or manual hours must be provided
-                if (!task_id && !hours) {
-                    res.status(400).json({ error: 'Entweder Hausarbeit oder manuelle Stundeneingabe ist erforderlich' });
-                    return;
-                }
-                // Validation: If hours provided, it must be for screen_time and negative
-                if (hours !== undefined) {
-                    if (entry_type !== 'screen_time') {
-                        res.status(400).json({ error: 'Manuelle Stundeneingabe nur für Bildschirmzeit erlaubt' });
+                // Validation for productive time with task_id
+                if (entry_type === 'productive') {
+                    if (!task_id) {
+                        res.status(400).json({ error: 'Für produktive Zeit muss eine Hausarbeit ausgewählt werden' });
                         return;
                     }
-                    if (typeof hours !== 'number' || hours >= 0) {
-                        res.status(400).json({ error: 'Bildschirmzeit muss als negative Zahl angegeben werden' });
+                    if (!input_minutes || typeof input_minutes !== 'number' || input_minutes <= 0) {
+                        res.status(400).json({ error: 'Für produktive Zeit muss die Arbeitszeit in Minuten angegeben werden' });
                         return;
+                    }
+                }
+                // Validation for screen_time: Either task_id or manual hours must be provided
+                if (entry_type === 'screen_time') {
+                    if (!task_id && !hours) {
+                        res.status(400).json({ error: 'Für Bildschirmzeit muss entweder eine Hausarbeit oder manuelle Stundeneingabe gewählt werden' });
+                        return;
+                    }
+                    // Validation: If hours provided, it must be negative
+                    if (hours !== undefined) {
+                        if (typeof hours !== 'number' || hours >= 0) {
+                            res.status(400).json({ error: 'Bildschirmzeit muss als negative Zahl angegeben werden' });
+                            return;
+                        }
                     }
                 }
                 const timeEntry = {
@@ -64,7 +73,9 @@ class TimeEntryController {
                     hours: hours || 0,
                     entry_type,
                     description: description || '',
-                    status: 'pending'
+                    status: 'pending',
+                    input_minutes: input_minutes || null,
+                    calculated_hours: null // Will be calculated by service
                 };
                 const createdEntry = yield this.timeEntryService.createTimeEntry(timeEntry);
                 // Send notification to admins about new time entry (async, don't wait)
@@ -266,17 +277,25 @@ class TimeEntryController {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { id } = req.params;
-                const { hours } = req.body;
+                const { hours, input_minutes } = req.body;
                 const user = req.user;
                 if (!user || user.role !== 'admin') {
                     res.status(403).json({ error: 'Keine Berechtigung' });
                     return;
                 }
-                if (!hours) {
-                    res.status(400).json({ error: 'Stunden sind erforderlich' });
+                if (!hours && !input_minutes) {
+                    res.status(400).json({ error: 'Stunden oder Minuten sind erforderlich' });
                     return;
                 }
-                const success = yield this.timeEntryService.updateTimeEntry(parseInt(id), parseFloat(hours), user.id);
+                let success;
+                if (input_minutes) {
+                    // Update mit Minuten für Weight Factor Einträge
+                    success = yield this.timeEntryService.updateTimeEntryByMinutes(parseInt(id), parseInt(input_minutes), user.id);
+                }
+                else {
+                    // Update mit Stunden für Legacy Einträge
+                    success = yield this.timeEntryService.updateTimeEntry(parseInt(id), parseFloat(hours), user.id);
+                }
                 if (success) {
                     res.json({ message: 'Zeiteintrag aktualisiert' });
                 }
@@ -299,9 +318,9 @@ class TimeEntryController {
                     res.status(403).json({ error: 'Keine Berechtigung' });
                     return;
                 }
-                const deletedCount = yield this.timeEntryService.cleanupOldEntries();
+                const deletedCount = yield this.timeEntryService.adminCleanupOldEntries();
                 res.json({
-                    message: 'Bereinigung abgeschlossen',
+                    message: 'Bereinigung abgeschlossen - Zeitkontostände bleiben unverändert',
                     deletedEntries: deletedCount
                 });
             }

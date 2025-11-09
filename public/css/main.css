@@ -154,6 +154,31 @@ header h1 {
     background: #dc2626;
 }
 
+.btn-warning {
+    background: #f59e0b;
+    color: white;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+}
+
+.btn-adjust-balance {
+    padding: 6px 8px;
+    background: #f59e0b;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.btn-adjust-balance:hover {
+    background: #d97706;
+    transform: scale(1.05);
+}
+
 /* Main App */
 .main-app {
     display: grid;
@@ -613,4 +638,286 @@ header h1 {
     background: white;
     border-radius: 8px;
     margin-top: 15px;
+}
+
+/* Adjust Balance Modal Styles */
+.balance-info {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.user-info-section, .current-balance-section {
+    margin-bottom: 8px;
+}
+
+.user-info-section:last-child, .current-balance-section:last-child {
+    margin-bottom: 0;
+}
+
+.balance-display {
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.balance-display.positive {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.balance-display.negative {
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.balance-display.neutral {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.balance-preview {
+    background: #fffbeb;
+    border: 1px solid #fbbf24;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+}
+
+.preview-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.preview-item:last-child {
+    margin-bottom: 0;
+    padding-top: 8px;
+    border-top: 1px solid #f59e0b;
+    font-weight: 600;
+}
+
+.preview-label {
+    font-weight: 500;
+    color: #92400e;
+}
+
+/* Confirmation Modal Styles */
+#confirmModal {
+    z-index: 2000 !important; /* Higher than other modals */
+}
+
+.confirm-message {
+    background: #fef2f2;
+    border: 1px solid #f87171;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+    text-align: center;
+}
+
+.confirm-message p {
+    margin: 0;
+    color: #991b1b;
+    font-weight: 500;
+    white-space: pre-line; /* Supports \n line breaks */
+}
+
+#confirmModal .modal-actions {
+    justify-content: center;
+    gap: 12px;
+}
+
+/* Critical actions styling */
+#confirmModal.critical .confirm-message {
+    background: #450a0a;
+    border: 2px solid #dc2626;
+    animation: pulse-danger 2s infinite;
+}
+
+#confirmModal.critical .confirm-message p {
+    color: #fecaca;
+    font-weight: 700;
+    font-size: 1.1em;
+}
+
+#confirmModal.critical h3 {
+    color: #dc2626;
+    text-transform: uppercase;
+    font-weight: 800;
+}
+
+@keyframes pulse-danger {
+    0% { border-color: #dc2626; }
+    50% { border-color: #ef4444; }
+    100% { border-color: #dc2626; }
+}
+
+#confirmModal .btn-danger {
+    background: #dc2626;
+    padding: 10px 20px;
+}
+
+#confirmModal .btn-danger:hover {
+    background: #b91c1c;
+}
+
+/* Different button colors for different actions */
+#confirmModal .btn-cleanup {
+    background: #f59e0b;
+    color: white;
+}
+
+#confirmModal .btn-cleanup:hover {
+    background: #d97706;
+}
+
+#confirmModal .btn-suspend {
+    background: #6b7280;
+    color: white;
+}
+
+#confirmModal .btn-suspend:hover {
+    background: #4b5563;
+}
+
+/* ================================
+   Zeit Transfer Styles  
+   ================================ */
+
+.balance-actions {
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+}
+
+.btn-gift {
+    background: linear-gradient(135deg, #ff6b6b, #ffa500);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+}
+
+.btn-gift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+    background: linear-gradient(135deg, #ff5252, #ff9800);
+}
+
+.transfer-preview {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+.preview-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.preview-item:last-child {
+    margin-bottom: 0;
+    padding-top: 8px;
+    border-top: 1px solid #e2e8f0;
+    font-weight: 600;
+}
+
+.preview-label {
+    color: #64748b;
+}
+
+.preview-value {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+/* Transfer Historie */
+.transfer-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.transfer-history-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.transfer-history-list {
+    margin: 15px 0;
+}
+
+.transfer-item {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.transfer-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.transfer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.transfer-icon {
+    font-size: 1.2em;
+    margin-right: 10px;
+}
+
+.transfer-action {
+    flex: 1;
+    font-size: 1em;
+}
+
+.transfer-date {
+    color: #64748b;
+    font-size: 0.9em;
+}
+
+.transfer-reason {
+    color: #64748b;
+    font-style: italic;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.transfer-sent {
+    border-left: 4px solid #ef4444;
+}
+
+.transfer-received {
+    border-left: 4px solid #22c55e;
+}
+
+.no-data-message {
+    text-align: center;
+    color: #64748b;
+    font-style: italic;
+    padding: 40px 20px;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin: 20px 0;
 }

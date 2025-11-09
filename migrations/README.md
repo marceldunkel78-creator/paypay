@@ -27,11 +27,12 @@ mysql -u paypay -p time_account_db < incremental-update.sql
 - **`incremental-update.sql`** - Safe updates for existing installations
 
 ### 📊 Individual Migration Files (Legacy)
-- `001-init.sql` - Core tables (users, time_accounts)
-- `002-time-entries.sql` - Time entries table (without task_id)  
-- `003-approval-system.sql` - Approval workflow extensions
-- `004-household-tasks.sql` - Household tasks table
-- `005-time-entries-task-id.sql` - Links time entries to household tasks
+1. `001-init.sql` - Core tables (users, time_accounts)
+2. `002-time-entries.sql` - Time entries table (without task_id)
+3. `003-approval-system.sql` - Approval workflow extensions
+4. `004-household-tasks.sql` - Household tasks table
+5. `005-time-entries-task-id.sql` - Links time entries to household tasks
+6. `006-weight-factors.sql` - Adds weight factors and input tracking for flexible time calculation
 - `run-migrations-in-order.sql` - Executes individual files in correct order
 
 ## ✅ What's Included
@@ -61,10 +62,16 @@ npm run migrate:unix
 ```
 users (id, username, password, email, role, is_approved)
 ├── time_accounts (user_id FK)
-├── time_entries (user_id FK, task_id FK, approved_by FK)
-│   └── household_tasks (task_id FK)
+├── time_entries (user_id FK, task_id FK, approved_by FK, input_minutes, calculated_hours)
+│   └── household_tasks (task_id FK, hours, weight_factor, description)
 └── user_time_balance (user_id FK)
 ```
+
+### New Weight Factor System (Migration 006)
+- **Reference Hours**: Original estimated time for the task
+- **Weight Factor**: Multiplier for actual input (0.6 - 1.5)
+- **Input Minutes**: User's actual time spent
+- **Calculated Hours**: input_minutes × weight_factor = credited time
 
 ## ⚠️ Important Notes
 

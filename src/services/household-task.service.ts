@@ -9,9 +9,9 @@ export class HouseholdTaskService {
         try {
             const db = await connectToDatabase();
             const query = `
-                SELECT id, name, hours, is_active, created_at, updated_at
+                SELECT id, name, description, hours, weight_factor, is_active, created_at, updated_at
                 FROM household_tasks 
-                WHERE is_active = TRUE
+                WHERE is_active = 1 
                 ORDER BY name ASC
             `;
             
@@ -20,7 +20,9 @@ export class HouseholdTaskService {
             return rows.map((row: any) => ({
                 id: row.id,
                 name: row.name,
-                hours: parseFloat(row.hours),
+                description: row.description,
+                hours: row.hours ? parseFloat(row.hours) : null,
+                weight_factor: parseFloat(row.weight_factor),
                 is_active: row.is_active,
                 created_at: new Date(row.created_at),
                 updated_at: new Date(row.updated_at)
@@ -36,7 +38,7 @@ export class HouseholdTaskService {
         try {
             const db = await connectToDatabase();
             const query = `
-                SELECT id, name, hours, is_active, created_at, updated_at
+                SELECT id, name, description, hours, weight_factor, is_active, created_at, updated_at
                 FROM household_tasks 
                 ORDER BY name ASC
             `;
@@ -46,7 +48,9 @@ export class HouseholdTaskService {
             return rows.map((row: any) => ({
                 id: row.id,
                 name: row.name,
-                hours: parseFloat(row.hours),
+                description: row.description,
+                hours: row.hours ? parseFloat(row.hours) : null,
+                weight_factor: parseFloat(row.weight_factor),
                 is_active: row.is_active,
                 created_at: new Date(row.created_at),
                 updated_at: new Date(row.updated_at)
@@ -62,7 +66,7 @@ export class HouseholdTaskService {
         try {
             const db = await connectToDatabase();
             const query = `
-                SELECT id, name, hours, is_active, created_at, updated_at
+                SELECT id, name, description, hours, weight_factor, is_active, created_at, updated_at
                 FROM household_tasks 
                 WHERE id = ?
             `;
@@ -77,7 +81,9 @@ export class HouseholdTaskService {
             return {
                 id: row.id,
                 name: row.name,
-                hours: parseFloat(row.hours),
+                description: row.description,
+                hours: row.hours ? parseFloat(row.hours) : null,
+                weight_factor: parseFloat(row.weight_factor),
                 is_active: row.is_active,
                 created_at: new Date(row.created_at),
                 updated_at: new Date(row.updated_at)
@@ -93,13 +99,13 @@ export class HouseholdTaskService {
         try {
             const db = await connectToDatabase();
             const query = `
-                INSERT INTO household_tasks (name, hours, is_active)
-                VALUES (?, ?, ?)
+                INSERT INTO household_tasks (name, description, hours, weight_factor, is_active)
+                VALUES (?, ?, ?, ?, ?)
             `;
             
             const [result] = await db.execute<ResultSetHeader>(
                 query,
-                [taskData.name, taskData.hours, taskData.is_active ?? true]
+                [taskData.name, taskData.description ?? null, taskData.hours ?? null, taskData.weight_factor ?? 1.00, taskData.is_active ?? true]
             );
 
             console.log('Household task created:', result.insertId);
@@ -134,6 +140,11 @@ export class HouseholdTaskService {
                 updateValues.push(updateData.name);
             }
             
+            if (updateData.description !== undefined) {
+                updateFields.push('description = ?');
+                updateValues.push(updateData.description);
+            }
+            
             if (updateData.hours !== undefined) {
                 updateFields.push('hours = ?');
                 updateValues.push(updateData.hours);
@@ -142,6 +153,11 @@ export class HouseholdTaskService {
             if (updateData.is_active !== undefined) {
                 updateFields.push('is_active = ?');
                 updateValues.push(updateData.is_active);
+            }
+            
+            if (updateData.weight_factor !== undefined) {
+                updateFields.push('weight_factor = ?');
+                updateValues.push(updateData.weight_factor);
             }
             
             if (updateFields.length === 0) {
@@ -208,6 +224,31 @@ export class HouseholdTaskService {
         } catch (error) {
             console.error('Error deactivating household task:', error);
             throw new Error('Failed to deactivate household task');
+        }
+    }
+
+    // Weight Factor für eine Hausarbeit aktualisieren
+    async updateWeightFactor(id: number, weightFactor: number): Promise<boolean> {
+        try {
+            const db = await connectToDatabase();
+            
+            // Validierung
+            if (weightFactor <= 0 || weightFactor > 5) {
+                throw new Error('Weight factor must be between 0.01 and 5.00');
+            }
+
+            const query = `
+                UPDATE household_tasks 
+                SET weight_factor = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `;
+            
+            const [result] = await db.execute<ResultSetHeader>(query, [weightFactor, id]);
+            
+            return result.affectedRows > 0;
+        } catch (error) {
+            console.error('Error updating weight factor:', error);
+            throw error; // Re-throw to preserve specific error messages
         }
     }
 }

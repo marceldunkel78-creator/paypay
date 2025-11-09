@@ -18,9 +18,9 @@ class HouseholdTaskService {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
                 const query = `
-                SELECT id, name, hours, is_active, created_at, updated_at
+                SELECT id, name, hours, weight_factor, is_active, created_at, updated_at
                 FROM household_tasks 
-                WHERE is_active = TRUE
+                WHERE is_active = 1 
                 ORDER BY name ASC
             `;
                 const [rows] = yield db.execute(query);
@@ -28,6 +28,7 @@ class HouseholdTaskService {
                     id: row.id,
                     name: row.name,
                     hours: parseFloat(row.hours),
+                    weight_factor: parseFloat(row.weight_factor),
                     is_active: row.is_active,
                     created_at: new Date(row.created_at),
                     updated_at: new Date(row.updated_at)
@@ -45,7 +46,7 @@ class HouseholdTaskService {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
                 const query = `
-                SELECT id, name, hours, is_active, created_at, updated_at
+                SELECT id, name, hours, weight_factor, is_active, created_at, updated_at
                 FROM household_tasks 
                 ORDER BY name ASC
             `;
@@ -54,6 +55,7 @@ class HouseholdTaskService {
                     id: row.id,
                     name: row.name,
                     hours: parseFloat(row.hours),
+                    weight_factor: parseFloat(row.weight_factor),
                     is_active: row.is_active,
                     created_at: new Date(row.created_at),
                     updated_at: new Date(row.updated_at)
@@ -71,7 +73,7 @@ class HouseholdTaskService {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
                 const query = `
-                SELECT id, name, hours, is_active, created_at, updated_at
+                SELECT id, name, hours, weight_factor, is_active, created_at, updated_at
                 FROM household_tasks 
                 WHERE id = ?
             `;
@@ -84,6 +86,7 @@ class HouseholdTaskService {
                     id: row.id,
                     name: row.name,
                     hours: parseFloat(row.hours),
+                    weight_factor: parseFloat(row.weight_factor),
                     is_active: row.is_active,
                     created_at: new Date(row.created_at),
                     updated_at: new Date(row.updated_at)
@@ -97,15 +100,15 @@ class HouseholdTaskService {
     }
     // Neue Hausarbeit erstellen (Admin)
     createHouseholdTask(taskData) {
-        var _a;
+        var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
                 const query = `
-                INSERT INTO household_tasks (name, hours, is_active)
-                VALUES (?, ?, ?)
+                INSERT INTO household_tasks (name, hours, weight_factor, is_active)
+                VALUES (?, ?, ?, ?)
             `;
-                const [result] = yield db.execute(query, [taskData.name, taskData.hours, (_a = taskData.is_active) !== null && _a !== void 0 ? _a : true]);
+                const [result] = yield db.execute(query, [taskData.name, taskData.hours, (_a = taskData.weight_factor) !== null && _a !== void 0 ? _a : 1.00, (_b = taskData.is_active) !== null && _b !== void 0 ? _b : true]);
                 console.log('Household task created:', result.insertId);
                 // Neu erstellte Hausarbeit zurückgeben
                 const createdTask = yield this.getHouseholdTaskById(result.insertId);
@@ -142,6 +145,10 @@ class HouseholdTaskService {
                 if (updateData.is_active !== undefined) {
                     updateFields.push('is_active = ?');
                     updateValues.push(updateData.is_active);
+                }
+                if (updateData.weight_factor !== undefined) {
+                    updateFields.push('weight_factor = ?');
+                    updateValues.push(updateData.weight_factor);
                 }
                 if (updateFields.length === 0) {
                     return false; // Keine Änderungen
@@ -202,6 +209,29 @@ class HouseholdTaskService {
             catch (error) {
                 console.error('Error deactivating household task:', error);
                 throw new Error('Failed to deactivate household task');
+            }
+        });
+    }
+    // Weight Factor für eine Hausarbeit aktualisieren
+    updateWeightFactor(id, weightFactor) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const db = yield (0, db_1.connectToDatabase)();
+                // Validierung
+                if (weightFactor <= 0 || weightFactor > 5) {
+                    throw new Error('Weight factor must be between 0.01 and 5.00');
+                }
+                const query = `
+                UPDATE household_tasks 
+                SET weight_factor = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `;
+                const [result] = yield db.execute(query, [weightFactor, id]);
+                return result.affectedRows > 0;
+            }
+            catch (error) {
+                console.error('Error updating weight factor:', error);
+                throw error; // Re-throw to preserve specific error messages
             }
         });
     }

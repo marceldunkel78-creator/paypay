@@ -2,16 +2,19 @@ import { Request, Response } from 'express';
 import { TimeAccountService } from '../services/timeaccount.service';
 import { EmailService } from '../services/email.service';
 import { AuthService } from '../services/auth.service';
+import { HouseholdTaskService } from '../services/household-task.service';
 
 export class AdminController {
     private timeAccountService: TimeAccountService;
     private emailService: EmailService;
     private authService: AuthService;
+    private householdTaskService: HouseholdTaskService;
 
     constructor() {
         this.timeAccountService = new TimeAccountService();
         this.emailService = new EmailService();
         this.authService = new AuthService();
+        this.householdTaskService = new HouseholdTaskService();
     }
 
     public async approveRequest(req: Request, res: Response): Promise<void> {
@@ -173,6 +176,76 @@ export class AdminController {
         } catch (error) {
             console.error('Error deleting user:', error);
             res.status(500).json({ message: 'Error deleting user', error });
+        }
+    }
+
+    // Weight Factor Management
+    public async getHouseholdTasks(req: Request, res: Response): Promise<void> {
+        try {
+            const tasks = await this.householdTaskService.getAllHouseholdTasks();
+            res.status(200).json(tasks);
+        } catch (error) {
+            console.error('Error fetching household tasks:', error);
+            res.status(500).json({ message: 'Error fetching household tasks', error });
+        }
+    }
+
+    public async updateWeightFactor(req: Request, res: Response): Promise<void> {
+        try {
+            const { taskId } = req.params;
+            const { weight_factor } = req.body;
+
+            if (!taskId || !weight_factor) {
+                res.status(400).json({ error: 'Task ID und Weight Factor sind erforderlich' });
+                return;
+            }
+
+            const weightFactorNum = parseFloat(weight_factor);
+            if (isNaN(weightFactorNum) || weightFactorNum <= 0 || weightFactorNum > 5) {
+                res.status(400).json({ error: 'Weight Factor muss zwischen 0.01 und 5.00 liegen' });
+                return;
+            }
+
+            const success = await this.householdTaskService.updateWeightFactor(parseInt(taskId), weightFactorNum);
+            
+            if (success) {
+                res.status(200).json({ message: 'Weight Factor erfolgreich aktualisiert' });
+            } else {
+                res.status(404).json({ error: 'Hausarbeit nicht gefunden' });
+            }
+        } catch (error) {
+            console.error('Error updating weight factor:', error);
+            res.status(500).json({ message: 'Error updating weight factor', error });
+        }
+    }
+
+    // User Balance Management
+    public async adjustUserBalance(req: Request, res: Response): Promise<void> {
+        try {
+            const { userId } = req.params;
+            const { balance } = req.body;
+
+            if (!userId || balance === undefined) {
+                res.status(400).json({ error: 'User ID und Balance sind erforderlich' });
+                return;
+            }
+
+            const balanceNum = parseFloat(balance);
+            if (isNaN(balanceNum)) {
+                res.status(400).json({ error: 'Balance muss eine gültige Zahl sein' });
+                return;
+            }
+
+            const success = await this.timeAccountService.adjustUserBalance(parseInt(userId), balanceNum);
+            
+            if (success) {
+                res.status(200).json({ message: 'Zeitkonto erfolgreich angepasst' });
+            } else {
+                res.status(404).json({ error: 'Benutzer nicht gefunden' });
+            }
+        } catch (error) {
+            console.error('Error adjusting user balance:', error);
+            res.status(500).json({ message: 'Error adjusting user balance', error });
         }
     }
 }

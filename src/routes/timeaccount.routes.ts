@@ -19,4 +19,12 @@ router.put('/time-accounts/:id', authMiddleware, (req, res) => {
 // Route to delete a time account
 router.delete('/time-accounts/:id', authMiddleware, (req, res) => timeAccountController.deleteTimeAccount(req, res));
 
+// Zeit-Transfer Routen
+router.post('/transfer-hours', authMiddleware, (req, res) => timeAccountController.transferHours(req, res));
+router.get('/balance', authMiddleware, (req, res) => timeAccountController.getUserBalance(req, res));
+router.get('/transfer-history', authMiddleware, (req, res) => timeAccountController.getTransferHistory(req, res));
+router.delete('/reset-transfer-history', authMiddleware, (req, res) => timeAccountController.resetTransferHistory(req, res));
+
+
+
 export default router;

@@ -84,4 +84,22 @@ export class AuthController {
             res.status(400).json({ message: errorMessage });
         }
     }
+
+    // Alle User abrufen (für Transfer-Modal)
+    public async getAllUsers(req: Request, res: Response): Promise<void> {
+        try {
+            console.log('Getting all users for transfer modal');
+            const users = await this.authService.getAllUsers();
+            console.log('All users:', users.map(u => ({ id: u.id, username: u.username, role: u.role, status: u.status })));
+            
+            // Nur aktive User mit 'user' Rolle für Transfers verfügbar machen (keine Admins)
+            const activeUsers = users.filter(user => user.status === 'active' && user.role === 'user');
+            console.log('Filtered active user-role users:', activeUsers.map(u => ({ id: u.id, username: u.username })));
+            
+            res.status(200).json(activeUsers);
+        } catch (error) {
+            console.error('Error getting all users:', error);
+            res.status(500).json({ message: 'Error retrieving users' });
+        }
+    }
 }

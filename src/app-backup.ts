@@ -1,12 +1,21 @@
-import express, { json, urlencoded } from 'express';
-import { connectToDatabase } from './db/index';
-import { runCompleteMigration } from './db/migrate-complete';
-import { passwordProtect } from './middlewares/password-protect.middleware';
+import express from 'express';
+import { json, urlencoded } from 'body-parser';
+import { connectToDatabase } from './db';
+import { migrateTimeEntries } from './db/migrate-timeentries';
+import { migrateApprovalSystem } from './db/migrate-approval';
+import { migrateHouseholdTasks } from './db/migrate-household-tasks';
+import { migrateTimeEntriesTaskId } from './db/migrate-timeentries-task-id';
+import { migrateUserEmail } from './db/migrate-user-email';
+import { migrateUserStatus } from './db/migrate-user-status';
+import { migrateWeightFactors } from './db/migrate-weight-factors';
+import { migrateTimeTransfers } from './db/migrate-time-transfers';
+import { removeDefaultUsers } from './db/migrate-remove-default-users';
 import authRoutes from './routes/auth.routes';
 import timeAccountRoutes from './routes/timeaccount.routes';
 import adminRoutes from './routes/admin.routes';
 import { TimeEntryRoutes } from './routes/timeentry.routes';
 import { HouseholdTaskRoutes } from './routes/household-task.routes';
+import { passwordProtect } from './middlewares/password-protect.middleware';
 
 const app = express();
 
@@ -39,7 +48,7 @@ app.get('/api', (req, res) => {
         version: '1.0.0',
         endpoints: {
             auth: '/api/auth (POST /register, POST /login)',
-            timeaccounts: '/api/timeaccount (GET, POST /balance, POST /transfer-hours)',
+            timeaccounts: '/api/timeaccounts (GET, POST /time-accounts)',
             timeentries: '/api/timeentries (POST /, GET /, GET /balance, DELETE /:id)',
             admin: '/api/admin (GET /requests, POST /approve/:id, POST /reject/:id)'
         },
@@ -66,13 +75,28 @@ app.use('/api/timeentries', timeEntryRoutes.router); // Only JWT auth, no passwo
 app.use('/api/household-tasks', householdTaskRoutes.router); // Only JWT auth, no password protection
 app.use('/api/admin', passwordProtect, adminRoutes);
 
-// Database connection and single migration
+// Database connection and migration
 connectToDatabase()
   .then(async (connection) => {
     console.log('Database connected successfully');
-    // Run single, complete migration
-    await runCompleteMigration();
-    console.log('All migrations completed successfully');
+    // Run time entries migration
+    await migrateTimeEntries();
+    // Run approval system migration
+    await migrateApprovalSystem();
+    // Run household tasks migration
+    await migrateHouseholdTasks();
+    // Run time entries task_id migration
+    await migrateTimeEntriesTaskId();
+    // Run user email migration
+    await migrateUserEmail();
+    // Run user status migration
+    await migrateUserStatus();
+    // Run weight factors migration
+    await migrateWeightFactors(connection);
+    // Run time transfers migration
+    await migrateTimeTransfers();
+    // Remove default test users
+    await removeDefaultUsers();
   })
   .catch((error) => {
     console.error('Database connection failed:', error);

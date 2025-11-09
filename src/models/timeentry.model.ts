@@ -7,8 +7,9 @@ export interface TimeEntry {
     description?: string;
     status: 'pending' | 'approved' | 'rejected';
     created_at?: Date;
-    approved_at?: Date;
-    approved_by?: number; // Admin user_id who approved
+
+    input_minutes?: number | null; // Eingabe in Minuten für Weight Factor System
+    calculated_hours?: number | null; // Berechnete Stunden basierend auf Weight Factor
     // Zusätzliche Felder für erweiterte Anzeige
     username?: string;
     task_name?: string; // Name der Hausarbeit für Anzeige

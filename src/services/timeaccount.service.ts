@@ -80,4 +80,214 @@ export class TimeAccountService {
         await this.updateTimeAccountStatus(accountId, 'rejected');
         return true;
     }
+
+    // Admin: User Balance Management
+    public async adjustUserBalance(userId: number, newBalance: number): Promise<boolean> {
+        try {
+            const connection = await connectToDatabase();
+            
+            // Prüfen ob Benutzer existiert
+            const [userRows] = await connection.execute(
+                'SELECT id FROM users WHERE id = ?',
+                [userId]
+            );
+            const users = userRows as any[];
+            
+            if (users.length === 0) {
+                return false; // User not found
+            }
+
+            // Balance aktualisieren oder einfügen (UPSERT)
+            await connection.execute(`
+                INSERT INTO user_time_balance (user_id, current_balance, last_updated)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON DUPLICATE KEY UPDATE
+                    current_balance = ?,
+                    last_updated = CURRENT_TIMESTAMP
+            `, [userId, newBalance, newBalance]);
+
+            console.log(`Admin adjusted balance for user ${userId} to ${newBalance} hours`);
+            return true;
+        } catch (error) {
+            console.error('Error adjusting user balance:', error);
+            throw new Error('Failed to adjust user balance');
+        }
+    }
+
+    // User: Zeit an anderen User verschenken
+    public async transferHoursToUser(fromUserId: number, toUserId: number, hours: number, reason?: string): Promise<boolean> {
+        try {
+            const connection = await connectToDatabase();
+            
+            // Validierung: Beide User müssen existieren
+            const [fromUserRows] = await connection.execute(
+                'SELECT id, username FROM users WHERE id = ?',
+                [fromUserId]
+            );
+            const [toUserRows] = await connection.execute(
+                'SELECT id, username FROM users WHERE id = ?',
+                [toUserId]
+            );
+            
+            const fromUsers = fromUserRows as any[];
+            const toUsers = toUserRows as any[];
+            
+            if (fromUsers.length === 0) {
+                throw new Error('Sender user not found');
+            }
+            if (toUsers.length === 0) {
+                throw new Error('Recipient user not found');
+            }
+            if (fromUserId === toUserId) {
+                throw new Error('Cannot transfer hours to yourself');
+            }
+            if (hours <= 0) {
+                throw new Error('Hours must be positive');
+            }
+
+            // Prüfen ob Sender genügend Guthaben hat
+            const [balanceRows] = await connection.execute(
+                'SELECT current_balance FROM user_time_balance WHERE user_id = ?',
+                [fromUserId]
+            );
+            const balances = balanceRows as any[];
+            const currentBalance = balances.length > 0 ? balances[0].current_balance : 0;
+            
+            if (currentBalance < hours) {
+                throw new Error(`Insufficient balance. Current balance: ${currentBalance} hours, requested: ${hours} hours`);
+            }
+
+            // Transaction für atomare Übertragung
+            await connection.query('START TRANSACTION');
+
+            try {
+                // Stunden vom Sender abziehen
+                await connection.execute(`
+                    INSERT INTO user_time_balance (user_id, current_balance, last_updated)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                    ON DUPLICATE KEY UPDATE
+                        current_balance = current_balance - ?,
+                        last_updated = CURRENT_TIMESTAMP
+                `, [fromUserId, -hours, hours]);
+
+                // Stunden zum Empfänger hinzufügen
+                await connection.execute(`
+                    INSERT INTO user_time_balance (user_id, current_balance, last_updated)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                    ON DUPLICATE KEY UPDATE
+                        current_balance = current_balance + ?,
+                        last_updated = CURRENT_TIMESTAMP
+                `, [toUserId, hours, hours]);
+
+                // Transfer-Log erstellen
+                await connection.execute(`
+                    INSERT INTO time_transfers (from_user_id, to_user_id, hours, reason, created_at)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                `, [fromUserId, toUserId, hours, reason || 'Zeitübertragung']);
+
+                await connection.query('COMMIT');
+                
+                console.log(`User ${fromUsers[0].username} transferred ${hours} hours to ${toUsers[0].username}`);
+                return true;
+                
+            } catch (transactionError) {
+                await connection.query('ROLLBACK');
+                throw transactionError;
+            }
+            
+        } catch (error) {
+            console.error('Error transferring hours:', error);
+            throw error;
+        }
+    }
+
+    // Aktuelle Balance eines Users abrufen
+    public async getUserBalance(userId: number): Promise<number> {
+        try {
+            const connection = await connectToDatabase();
+            
+            // Versuche zuerst aus der user_time_balance Tabelle zu laden
+            const [balanceRows] = await connection.execute(
+                'SELECT current_balance FROM user_time_balance WHERE user_id = ?',
+                [userId]
+            );
+            const balances = balanceRows as any[];
+            
+            if (balances.length > 0) {
+                return parseFloat(balances[0].current_balance);
+            }
+            
+            // Falls kein Eintrag existiert, berechne aus time_entries
+            const [entryRows] = await connection.execute(`
+                SELECT SUM(hours) as total_hours 
+                FROM time_entries 
+                WHERE user_id = ?
+            `, [userId]);
+            
+            const entries = entryRows as any[];
+            const calculatedBalance = entries.length > 0 ? parseFloat(entries[0].total_hours || '0') : 0;
+            
+            // Erstelle Eintrag in user_time_balance für zukünftige Abfragen
+            if (calculatedBalance !== 0) {
+                await connection.execute(`
+                    INSERT INTO user_time_balance (user_id, current_balance, last_updated)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                `, [userId, calculatedBalance]);
+            }
+            
+            return calculatedBalance;
+        } catch (error) {
+            console.error('Error getting user balance:', error);
+            return 0;
+        }
+    }
+
+    // Transfer-Historie für einen User abrufen (als Sender oder Empfänger)
+    public async getTransferHistory(userId: number): Promise<any[]> {
+        try {
+            const connection = await connectToDatabase();
+            const [rows] = await connection.execute(`
+                SELECT 
+                    tt.*,
+                    fu.username as from_username,
+                    tu.username as to_username
+                FROM time_transfers tt
+                JOIN users fu ON tt.from_user_id = fu.id
+                JOIN users tu ON tt.to_user_id = tu.id
+                WHERE tt.from_user_id = ? OR tt.to_user_id = ?
+                ORDER BY tt.created_at DESC
+                LIMIT 50
+            `, [userId, userId]);
+            
+            const transfers = rows as any[];
+            return transfers.map(transfer => ({
+                id: transfer.id,
+                fromUserId: transfer.from_user_id,
+                fromUsername: transfer.from_username,
+                toUserId: transfer.to_user_id,
+                toUsername: transfer.to_username,
+                hours: parseFloat(transfer.hours),
+                reason: transfer.reason,
+                createdAt: transfer.created_at,
+                type: transfer.from_user_id === userId ? 'sent' : 'received'
+            }));
+        } catch (error) {
+            console.error('Error getting transfer history:', error);
+            return [];
+        }
+    }
+
+    // Transfer-Historie für einen User zurücksetzen
+    public async resetTransferHistory(userId: number): Promise<void> {
+        const connection = await connectToDatabase();
+        try {
+            await connection.execute(
+                'DELETE FROM time_transfers WHERE from_user_id = ? OR to_user_id = ?',
+                [userId, userId]
+            );
+        } catch (error) {
+            console.error('Error resetting transfer history:', error);
+            throw new Error('Failed to reset transfer history');
+        }
+    }
 }

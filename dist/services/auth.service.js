@@ -212,6 +212,20 @@ class AuthService {
             }
         });
     }
+    activateUser(userId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const connection = yield (0, index_1.connectToDatabase)();
+                const [result] = yield connection.execute('UPDATE users SET status = ? WHERE id = ? AND status = ?', ['active', userId, 'suspended']);
+                const updateResult = result;
+                return updateResult.affectedRows > 0;
+            }
+            catch (error) {
+                console.error('Error activating user:', error);
+                throw error;
+            }
+        });
+    }
     deleteUser(userId) {
         return __awaiter(this, void 0, void 0, function* () {
             try {

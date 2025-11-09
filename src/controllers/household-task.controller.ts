@@ -66,7 +66,7 @@ export class HouseholdTaskController {
     // Neue Hausarbeit erstellen (Admin)
     async createHouseholdTask(req: Request, res: Response): Promise<void> {
         try {
-            const { name, hours, is_active } = req.body;
+            const { name, description, hours, weight_factor, is_active } = req.body;
             const user_role = (req as any).user?.role;
 
             if (user_role !== 'admin') {
@@ -74,19 +74,16 @@ export class HouseholdTaskController {
                 return;
             }
 
-            if (!name || hours === undefined) {
-                res.status(400).json({ error: 'Name und Stunden sind erforderlich' });
-                return;
-            }
-
-            if (hours < 0 || hours > 24) {
-                res.status(400).json({ error: 'Stunden müssen zwischen 0 und 24 liegen' });
+            if (!name || typeof name !== 'string' || name.trim().length === 0) {
+                res.status(400).json({ error: 'Name ist erforderlich' });
                 return;
             }
 
             const taskData: CreateHouseholdTaskRequest = {
                 name: name.trim(),
-                hours: parseFloat(hours),
+                description: description || '',
+                hours: hours ? parseFloat(hours) : null,
+                weight_factor: weight_factor ? parseFloat(weight_factor) : 1.00,
                 is_active: is_active ?? true
             };
 
@@ -106,7 +103,7 @@ export class HouseholdTaskController {
     async updateHouseholdTask(req: Request, res: Response): Promise<void> {
         try {
             const { id } = req.params;
-            const { name, hours, is_active } = req.body;
+            const { name, description, hours, weight_factor, is_active } = req.body;
             const user_role = (req as any).user?.role;
 
             if (user_role !== 'admin') {
@@ -120,16 +117,20 @@ export class HouseholdTaskController {
                 updateData.name = name.trim();
             }
 
+            if (description !== undefined) {
+                updateData.description = description;
+            }
+
             if (hours !== undefined) {
-                if (hours < 0 || hours > 24) {
-                    res.status(400).json({ error: 'Stunden müssen zwischen 0 und 24 liegen' });
-                    return;
-                }
                 updateData.hours = parseFloat(hours);
             }
 
             if (is_active !== undefined) {
                 updateData.is_active = Boolean(is_active);
+            }
+
+            if (weight_factor !== undefined) {
+                updateData.weight_factor = parseFloat(weight_factor);
             }
 
             const success = await this.householdTaskService.updateHouseholdTask(parseInt(id), updateData);

@@ -1,27 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -35,19 +12,28 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importStar(require("express"));
-const index_1 = require("./db/index");
-const migrate_complete_1 = require("./db/migrate-complete");
-const password_protect_middleware_1 = require("./middlewares/password-protect.middleware");
+const express_1 = __importDefault(require("express"));
+const body_parser_1 = require("body-parser");
+const db_1 = require("./db");
+const migrate_timeentries_1 = require("./db/migrate-timeentries");
+const migrate_approval_1 = require("./db/migrate-approval");
+const migrate_household_tasks_1 = require("./db/migrate-household-tasks");
+const migrate_timeentries_task_id_1 = require("./db/migrate-timeentries-task-id");
+const migrate_user_email_1 = require("./db/migrate-user-email");
+const migrate_user_status_1 = require("./db/migrate-user-status");
+const migrate_weight_factors_1 = require("./db/migrate-weight-factors");
+const migrate_time_transfers_1 = require("./db/migrate-time-transfers");
+const migrate_remove_default_users_1 = require("./db/migrate-remove-default-users");
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const timeaccount_routes_1 = __importDefault(require("./routes/timeaccount.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const timeentry_routes_1 = require("./routes/timeentry.routes");
 const household_task_routes_1 = require("./routes/household-task.routes");
+const password_protect_middleware_1 = require("./middlewares/password-protect.middleware");
 const app = (0, express_1.default)();
 // Middleware
-app.use((0, express_1.json)());
-app.use((0, express_1.urlencoded)({ extended: true }));
+app.use((0, body_parser_1.json)());
+app.use((0, body_parser_1.urlencoded)({ extended: true }));
 // Serve static files from public directory
 app.use(express_1.default.static('public'));
 // Public routes (no password protection)
@@ -70,7 +56,7 @@ app.get('/api', (req, res) => {
         version: '1.0.0',
         endpoints: {
             auth: '/api/auth (POST /register, POST /login)',
-            timeaccounts: '/api/timeaccount (GET, POST /balance, POST /transfer-hours)',
+            timeaccounts: '/api/timeaccounts (GET, POST /time-accounts)',
             timeentries: '/api/timeentries (POST /, GET /, GET /balance, DELETE /:id)',
             admin: '/api/admin (GET /requests, POST /approve/:id, POST /reject/:id)'
         },
@@ -93,13 +79,28 @@ app.use('/api/timeaccount', timeaccount_routes_1.default); // Only JWT auth, no 
 app.use('/api/timeentries', timeEntryRoutes.router); // Only JWT auth, no password protection
 app.use('/api/household-tasks', householdTaskRoutes.router); // Only JWT auth, no password protection
 app.use('/api/admin', password_protect_middleware_1.passwordProtect, admin_routes_1.default);
-// Database connection and single migration
-(0, index_1.connectToDatabase)()
+// Database connection and migration
+(0, db_1.connectToDatabase)()
     .then((connection) => __awaiter(void 0, void 0, void 0, function* () {
     console.log('Database connected successfully');
-    // Run single, complete migration
-    yield (0, migrate_complete_1.runCompleteMigration)();
-    console.log('All migrations completed successfully');
+    // Run time entries migration
+    yield (0, migrate_timeentries_1.migrateTimeEntries)();
+    // Run approval system migration
+    yield (0, migrate_approval_1.migrateApprovalSystem)();
+    // Run household tasks migration
+    yield (0, migrate_household_tasks_1.migrateHouseholdTasks)();
+    // Run time entries task_id migration
+    yield (0, migrate_timeentries_task_id_1.migrateTimeEntriesTaskId)();
+    // Run user email migration
+    yield (0, migrate_user_email_1.migrateUserEmail)();
+    // Run user status migration
+    yield (0, migrate_user_status_1.migrateUserStatus)();
+    // Run weight factors migration
+    yield (0, migrate_weight_factors_1.migrateWeightFactors)(connection);
+    // Run time transfers migration
+    yield (0, migrate_time_transfers_1.migrateTimeTransfers)();
+    // Remove default test users
+    yield (0, migrate_remove_default_users_1.removeDefaultUsers)();
 }))
     .catch((error) => {
     console.error('Database connection failed:', error);
