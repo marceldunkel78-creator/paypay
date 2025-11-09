@@ -3,7 +3,7 @@
 # Production-ready setup with MySQL and reverse proxy
 # ==============================================
 
-version: '3.8'
+# version: '3.8' # Removed - obsolete in newer Docker Compose versions
 
 services:
   # Time Account Management Application
@@ -11,21 +11,25 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      platforms:
-        - linux/arm64  # For Raspberry Pi 4
-        - linux/arm/v7 # For older Raspberry Pi
     container_name: time-account-app
     restart: unless-stopped
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - DATABASE_URL=mysql://timeaccount:${DB_PASSWORD}@mysql:3306/time_account_db
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3000}
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-paypay}
+      - DB_USER=${DB_USER:-paypay}
+      - DB_PASSWORD=${DB_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
-      - EMAIL_SERVICE=${EMAIL_SERVICE}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
       - EMAIL_USER=${EMAIL_USER}
       - EMAIL_PASS=${EMAIL_PASS}
-      - ADMIN_EMAIL_1=${ADMIN_EMAIL_1}
-      - ADMIN_EMAIL_2=${ADMIN_EMAIL_2}
+      - EMAIL_FROM=${EMAIL_FROM}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - DOMAIN=${DOMAIN}
     depends_on:
       mysql:
         condition: service_healthy
@@ -40,10 +44,10 @@ services:
     container_name: time-account-mysql
     restart: unless-stopped
     environment:
-      - MYSQL_DATABASE=time_account_db
-      - MYSQL_USER=timeaccount
-      - MYSQL_PASSWORD=${DB_PASSWORD}
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-paypay}
+      - MYSQL_USER=${MYSQL_USER:-paypay}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
     ports:
       - "3306:3306"  # Remove this in production for security
     volumes:

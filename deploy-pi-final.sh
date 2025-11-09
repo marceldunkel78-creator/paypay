@@ -32,7 +32,39 @@ sh get-docker.sh
 sudo usermod -aG docker $USER
 
 echo "Installing Docker Compose..."
-sudo pip3 install docker-compose
+# Modern method for Raspberry Pi OS (Bookworm)
+if command -v apt &> /dev/null; then
+    # Try apt package manager first (recommended)
+    sudo apt update
+    sudo apt install -y docker-compose-plugin
+    
+    # If that fails, try the standalone version
+    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+        echo "Installing Docker Compose standalone..."
+        sudo curl -L "https://github.com/docker/compose/releases/download/v2.21.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+    fi
+else
+    # Fallback for older systems
+    sudo pip3 install docker-compose --break-system-packages
+fi
+
+# Verify installation
+if command -v docker-compose &> /dev/null; then
+    echo "✓ Docker Compose installed successfully (standalone)"
+    docker-compose --version
+elif docker compose version &> /dev/null; then
+    echo "✓ Docker Compose plugin installed successfully"
+    docker compose version
+    # Create symlink for compatibility
+    sudo ln -sf /usr/bin/docker /usr/local/bin/docker-compose
+    echo '#!/bin/bash' | sudo tee /usr/local/bin/docker-compose > /dev/null
+    echo 'docker compose "$@"' | sudo tee -a /usr/local/bin/docker-compose > /dev/null
+    sudo chmod +x /usr/local/bin/docker-compose
+else
+    echo "✗ Docker Compose installation failed"
+    exit 1
+fi
 
 # Create application directory
 echo "Setting up application directory..."
@@ -45,7 +77,7 @@ echo "Setting up application files..."
 
 # Create production environment file
 echo "Creating production environment file..."
-cat > .env.production << EOF
+cat > .env << EOF
 NODE_ENV=production
 PORT=3000
 
@@ -95,10 +127,16 @@ fi
 
 # Build and start services
 echo "Building Docker images..."
-sudo docker-compose -f docker-compose.yml build
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+else
+    DOCKER_COMPOSE="docker compose"
+fi
+
+sudo $DOCKER_COMPOSE -f docker-compose.yml build
 
 echo "Starting services..."
-sudo docker-compose -f docker-compose.yml up -d
+sudo $DOCKER_COMPOSE -f docker-compose.yml up -d
 
 # Wait for services to be ready
 echo "Waiting for services to start..."
@@ -106,7 +144,7 @@ sleep 30
 
 # Check if services are running
 echo "Checking service status..."
-sudo docker-compose -f docker-compose.yml ps
+sudo $DOCKER_COMPOSE -f docker-compose.yml ps
 
 # Test application
 echo "Testing application..."
@@ -131,12 +169,12 @@ if [ "$DOMAIN" != "your-domain.com" ]; then
     echo "0 12 * * * /usr/bin/certbot renew --quiet" | sudo crontab -
     
     # Restart nginx with SSL
-    sudo docker-compose restart nginx
+    sudo $DOCKER_COMPOSE restart nginx
 fi
 
 # Create admin user
 echo "Creating admin user..."
-sudo docker-compose exec app node scripts/create-admin.js
+sudo $DOCKER_COMPOSE exec app node scripts/create-admin.js
 
 echo ""
 echo "=== Deployment Complete! ==="
@@ -163,6 +201,6 @@ echo "2. Configure email settings in .env.production"
 echo "3. Set up regular backups"
 echo "4. Monitor system resources"
 echo ""
-echo "For troubleshooting, check: docker-compose logs"
+echo "For troubleshooting, check: $DOCKER_COMPOSE logs"
 echo "For system monitoring, use: htop, docker stats"
 echo ""
