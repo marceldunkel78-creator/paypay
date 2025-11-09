@@ -22,15 +22,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.runCompleteMigration = void 0;
 const index_1 = require("./index");
@@ -103,64 +94,63 @@ function parseSQLStatements(sql) {
         return trimmed.length > 1 && !trimmed.startsWith('--');
     });
 }
-function runCompleteMigration() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            console.log('Starting complete database migration...');
-            const connection = yield (0, index_1.connectToDatabase)();
-            // Lade die konsolidierte SQL-Datei
-            const sqlPath = path.join(__dirname, '../../migrations/complete-database-setup.sql');
-            const migrationSQL = fs.readFileSync(sqlPath, 'utf8');
-            // Erweiterte SQL-Parsing: Berücksichtige mehrzeilige Statements und Kommentare
-            const statements = parseSQLStatements(migrationSQL);
-            console.log(`Executing ${statements.length} SQL statements...`);
-            // Führe jeden SQL-Befehl einzeln aus
-            let executedCount = 0;
-            for (let i = 0; i < statements.length; i++) {
-                const statement = statements[i];
-                // Überspringe Kommentare und leere Zeilen
-                if (statement.startsWith('--') || statement.length < 5) {
-                    continue;
+async function runCompleteMigration() {
+    try {
+        console.log('Starting complete database migration...');
+        const connection = await (0, index_1.connectToDatabase)();
+        // Lade die konsolidierte SQL-Datei
+        const sqlPath = path.join(__dirname, '../../migrations/complete-database-setup.sql');
+        const migrationSQL = fs.readFileSync(sqlPath, 'utf8');
+        // Erweiterte SQL-Parsing: Berücksichtige mehrzeilige Statements und Kommentare
+        const statements = parseSQLStatements(migrationSQL);
+        console.log(`Executing ${statements.length} SQL statements...`);
+        // Führe jeden SQL-Befehl einzeln aus
+        let executedCount = 0;
+        for (let i = 0; i < statements.length; i++) {
+            const statement = statements[i];
+            // Überspringe Kommentare und leere Zeilen
+            if (statement.startsWith('--') || statement.length < 5) {
+                continue;
+            }
+            try {
+                // Debug: Zeige ersten Teil des Statements
+                const preview = statement.length > 100 ? statement.substring(0, 100) + '...' : statement;
+                console.log(`Executing statement ${i + 1}/${statements.length}: ${preview}`);
+                // Verwende query() für Statements, die nicht mit prepared statements funktionieren
+                if (statement.trim().toUpperCase().startsWith('ALTER DATABASE') ||
+                    statement.trim().toUpperCase().startsWith('SET FOREIGN_KEY_CHECKS') ||
+                    statement.trim().toUpperCase().startsWith('USE ')) {
+                    await connection.query(statement);
                 }
-                try {
-                    // Debug: Zeige ersten Teil des Statements
-                    const preview = statement.length > 100 ? statement.substring(0, 100) + '...' : statement;
-                    console.log(`Executing statement ${i + 1}/${statements.length}: ${preview}`);
-                    // Verwende query() für Statements, die nicht mit prepared statements funktionieren
-                    if (statement.trim().toUpperCase().startsWith('ALTER DATABASE') ||
-                        statement.trim().toUpperCase().startsWith('SET FOREIGN_KEY_CHECKS') ||
-                        statement.trim().toUpperCase().startsWith('USE ')) {
-                        yield connection.query(statement);
-                    }
-                    else {
-                        yield connection.execute(statement);
-                    }
-                    executedCount++;
+                else {
+                    await connection.execute(statement);
                 }
-                catch (error) {
-                    console.error(`Error in statement ${i + 1}:`, statement.substring(0, 200));
-                    console.error(`Error message:`, error);
-                    // Ignoriere bestimmte erwartete Fehler
-                    if (error instanceof Error &&
-                        (error.message.includes('already exists') ||
-                            error.message.includes('Table') && error.message.includes('already exists') ||
-                            error.message.includes('Duplicate column name') ||
-                            error.message.includes('duplicate column name'))) {
-                        console.log('Skipping already exists/duplicate column error...');
-                    }
-                    else {
-                        // Bei anderen Fehlern: Warning, aber weitermachen
-                        console.warn(`Warning in statement ${i + 1}:`, error);
-                    }
+                executedCount++;
+            }
+            catch (error) {
+                console.error(`Error in statement ${i + 1}:`, statement.substring(0, 200));
+                console.error(`Error message:`, error);
+                // Ignoriere bestimmte erwartete Fehler
+                if (error instanceof Error &&
+                    (error.message.includes('already exists') ||
+                        error.message.includes('Table') && error.message.includes('already exists') ||
+                        error.message.includes('Duplicate column name') ||
+                        error.message.includes('duplicate column name'))) {
+                    console.log('Skipping already exists/duplicate column error...');
+                }
+                else {
+                    // Bei anderen Fehlern: Warning, aber weitermachen
+                    console.warn(`Warning in statement ${i + 1}:`, error);
                 }
             }
-            console.log(`Executed ${executedCount} SQL statements successfully.`);
-            console.log('Complete database migration completed successfully!');
         }
-        catch (error) {
-            console.error('Error in complete migration:', error);
-            throw error;
-        }
-    });
+        console.log(`Executed ${executedCount} SQL statements successfully.`);
+        console.log('Complete database migration completed successfully!');
+    }
+    catch (error) {
+        console.error('Error in complete migration:', error);
+        throw error;
+    }
 }
 exports.runCompleteMigration = runCompleteMigration;
+//# sourceMappingURL=migrate-complete.js.map

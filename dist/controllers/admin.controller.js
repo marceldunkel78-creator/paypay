@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminController = void 0;
 const timeaccount_service_1 = require("../services/timeaccount.service");
@@ -21,246 +12,223 @@ class AdminController {
         this.authService = new auth_service_1.AuthService();
         this.householdTaskService = new household_task_service_1.HouseholdTaskService();
     }
-    approveRequest(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { requestId } = req.params;
+    async approveRequest(req, res) {
+        const { requestId } = req.params;
+        try {
+            const request = await this.timeAccountService.getRequestById(parseInt(requestId));
+            if (!request) {
+                res.status(404).send('Request not found');
+                return;
+            }
+            await this.timeAccountService.approveRequest(parseInt(requestId));
+            // Send email notification if email is configured
             try {
-                const request = yield this.timeAccountService.getRequestById(parseInt(requestId));
-                if (!request) {
-                    res.status(404).send('Request not found');
-                    return;
+                if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+                    await this.emailService.sendApprovalConfirmation(request.userEmail);
+                    console.log(`Approval notification sent to ${request.userEmail}`);
                 }
-                yield this.timeAccountService.approveRequest(parseInt(requestId));
-                // Send email notification if email is configured
-                try {
-                    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-                        yield this.emailService.sendApprovalConfirmation(request.userEmail);
-                        console.log(`Approval notification sent to ${request.userEmail}`);
-                    }
-                    else {
-                        console.log('Email not configured - skipping notification');
-                    }
+                else {
+                    console.log('Email not configured - skipping notification');
                 }
-                catch (emailError) {
-                    console.warn('Failed to send email notification:', emailError);
-                    // Continue without failing the request
-                }
-                res.status(200).send('Request approved and user notified');
             }
-            catch (error) {
-                res.status(500).send('Error approving request');
+            catch (emailError) {
+                console.warn('Failed to send email notification:', emailError);
+                // Continue without failing the request
             }
-        });
+            res.status(200).send('Request approved and user notified');
+        }
+        catch (error) {
+            res.status(500).send('Error approving request');
+        }
     }
-    rejectRequest(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { requestId } = req.params;
+    async rejectRequest(req, res) {
+        const { requestId } = req.params;
+        try {
+            const request = await this.timeAccountService.getRequestById(parseInt(requestId));
+            if (!request) {
+                res.status(404).send('Request not found');
+                return;
+            }
+            await this.timeAccountService.rejectRequest(parseInt(requestId));
+            // Send email notification if email is configured
             try {
-                const request = yield this.timeAccountService.getRequestById(parseInt(requestId));
-                if (!request) {
-                    res.status(404).send('Request not found');
-                    return;
+                if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+                    await this.emailService.sendRejectionNotification(request.userEmail);
+                    console.log(`Rejection notification sent to ${request.userEmail}`);
                 }
-                yield this.timeAccountService.rejectRequest(parseInt(requestId));
-                // Send email notification if email is configured
-                try {
-                    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-                        yield this.emailService.sendRejectionNotification(request.userEmail);
-                        console.log(`Rejection notification sent to ${request.userEmail}`);
-                    }
-                    else {
-                        console.log('Email not configured - skipping notification');
-                    }
+                else {
+                    console.log('Email not configured - skipping notification');
                 }
-                catch (emailError) {
-                    console.warn('Failed to send email notification:', emailError);
-                    // Continue without failing the request
-                }
-                res.status(200).send('Request rejected and user notified');
             }
-            catch (error) {
-                res.status(500).send('Error rejecting request');
+            catch (emailError) {
+                console.warn('Failed to send email notification:', emailError);
+                // Continue without failing the request
             }
-        });
+            res.status(200).send('Request rejected and user notified');
+        }
+        catch (error) {
+            res.status(500).send('Error rejecting request');
+        }
     }
-    getPendingRequests(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const requests = yield this.timeAccountService.getTimeAccounts();
-                const pendingRequests = requests.filter(req => req.status === 'pending');
-                res.status(200).json(pendingRequests);
-            }
-            catch (error) {
-                res.status(500).json({ message: 'Error retrieving pending requests', error });
-            }
-        });
+    async getPendingRequests(req, res) {
+        try {
+            const requests = await this.timeAccountService.getTimeAccounts();
+            const pendingRequests = requests.filter(req => req.status === 'pending');
+            res.status(200).json(pendingRequests);
+        }
+        catch (error) {
+            res.status(500).json({ message: 'Error retrieving pending requests', error });
+        }
     }
     // User Management Methods
-    getAllUsers(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const users = yield this.authService.getAllUsers();
-                res.status(200).json(users);
-            }
-            catch (error) {
-                console.error('Error fetching all users:', error);
-                res.status(500).json({ message: 'Error retrieving users', error });
-            }
-        });
+    async getAllUsers(req, res) {
+        try {
+            const users = await this.authService.getAllUsers();
+            res.status(200).json(users);
+        }
+        catch (error) {
+            console.error('Error fetching all users:', error);
+            res.status(500).json({ message: 'Error retrieving users', error });
+        }
     }
-    getPendingUsers(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const pendingUsers = yield this.authService.getPendingUsers();
-                res.status(200).json(pendingUsers);
-            }
-            catch (error) {
-                console.error('Error fetching pending users:', error);
-                res.status(500).json({ message: 'Error retrieving pending users', error });
-            }
-        });
+    async getPendingUsers(req, res) {
+        try {
+            const pendingUsers = await this.authService.getPendingUsers();
+            res.status(200).json(pendingUsers);
+        }
+        catch (error) {
+            console.error('Error fetching pending users:', error);
+            res.status(500).json({ message: 'Error retrieving pending users', error });
+        }
     }
-    approveUser(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { userId } = req.params;
-            try {
-                const success = yield this.authService.approveUser(parseInt(userId));
-                if (success) {
-                    res.status(200).json({ message: 'User approved successfully' });
-                }
-                else {
-                    res.status(404).json({ message: 'User not found or not pending' });
-                }
+    async approveUser(req, res) {
+        const { userId } = req.params;
+        try {
+            const success = await this.authService.approveUser(parseInt(userId));
+            if (success) {
+                res.status(200).json({ message: 'User approved successfully' });
             }
-            catch (error) {
-                console.error('Error approving user:', error);
-                res.status(500).json({ message: 'Error approving user', error });
+            else {
+                res.status(404).json({ message: 'User not found or not pending' });
             }
-        });
+        }
+        catch (error) {
+            console.error('Error approving user:', error);
+            res.status(500).json({ message: 'Error approving user', error });
+        }
     }
-    suspendUser(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { userId } = req.params;
-            try {
-                const success = yield this.authService.suspendUser(parseInt(userId));
-                if (success) {
-                    res.status(200).json({ message: 'User suspended successfully' });
-                }
-                else {
-                    res.status(404).json({ message: 'User not found' });
-                }
+    async suspendUser(req, res) {
+        const { userId } = req.params;
+        try {
+            const success = await this.authService.suspendUser(parseInt(userId));
+            if (success) {
+                res.status(200).json({ message: 'User suspended successfully' });
             }
-            catch (error) {
-                console.error('Error suspending user:', error);
-                res.status(500).json({ message: 'Error suspending user', error });
+            else {
+                res.status(404).json({ message: 'User not found' });
             }
-        });
+        }
+        catch (error) {
+            console.error('Error suspending user:', error);
+            res.status(500).json({ message: 'Error suspending user', error });
+        }
     }
-    activateUser(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { userId } = req.params;
-            try {
-                const success = yield this.authService.activateUser(parseInt(userId));
-                if (success) {
-                    res.status(200).json({ message: 'User activated successfully' });
-                }
-                else {
-                    res.status(404).json({ message: 'User not found or not suspended' });
-                }
+    async activateUser(req, res) {
+        const { userId } = req.params;
+        try {
+            const success = await this.authService.activateUser(parseInt(userId));
+            if (success) {
+                res.status(200).json({ message: 'User activated successfully' });
             }
-            catch (error) {
-                console.error('Error activating user:', error);
-                res.status(500).json({ message: 'Error activating user', error });
+            else {
+                res.status(404).json({ message: 'User not found or not suspended' });
             }
-        });
+        }
+        catch (error) {
+            console.error('Error activating user:', error);
+            res.status(500).json({ message: 'Error activating user', error });
+        }
     }
-    deleteUser(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { userId } = req.params;
-            try {
-                const success = yield this.authService.deleteUser(parseInt(userId));
-                if (success) {
-                    res.status(200).json({ message: 'User and all associated data deleted successfully' });
-                }
-                else {
-                    res.status(404).json({ message: 'User not found' });
-                }
+    async deleteUser(req, res) {
+        const { userId } = req.params;
+        try {
+            const success = await this.authService.deleteUser(parseInt(userId));
+            if (success) {
+                res.status(200).json({ message: 'User and all associated data deleted successfully' });
             }
-            catch (error) {
-                console.error('Error deleting user:', error);
-                res.status(500).json({ message: 'Error deleting user', error });
+            else {
+                res.status(404).json({ message: 'User not found' });
             }
-        });
+        }
+        catch (error) {
+            console.error('Error deleting user:', error);
+            res.status(500).json({ message: 'Error deleting user', error });
+        }
     }
     // Weight Factor Management
-    getHouseholdTasks(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const tasks = yield this.householdTaskService.getAllHouseholdTasks();
-                res.status(200).json(tasks);
-            }
-            catch (error) {
-                console.error('Error fetching household tasks:', error);
-                res.status(500).json({ message: 'Error fetching household tasks', error });
-            }
-        });
+    async getHouseholdTasks(req, res) {
+        try {
+            const tasks = await this.householdTaskService.getAllHouseholdTasks();
+            res.status(200).json(tasks);
+        }
+        catch (error) {
+            console.error('Error fetching household tasks:', error);
+            res.status(500).json({ message: 'Error fetching household tasks', error });
+        }
     }
-    updateWeightFactor(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const { taskId } = req.params;
-                const { weight_factor } = req.body;
-                if (!taskId || !weight_factor) {
-                    res.status(400).json({ error: 'Task ID und Weight Factor sind erforderlich' });
-                    return;
-                }
-                const weightFactorNum = parseFloat(weight_factor);
-                if (isNaN(weightFactorNum) || weightFactorNum <= 0 || weightFactorNum > 5) {
-                    res.status(400).json({ error: 'Weight Factor muss zwischen 0.01 und 5.00 liegen' });
-                    return;
-                }
-                const success = yield this.householdTaskService.updateWeightFactor(parseInt(taskId), weightFactorNum);
-                if (success) {
-                    res.status(200).json({ message: 'Weight Factor erfolgreich aktualisiert' });
-                }
-                else {
-                    res.status(404).json({ error: 'Hausarbeit nicht gefunden' });
-                }
+    async updateWeightFactor(req, res) {
+        try {
+            const { taskId } = req.params;
+            const { weight_factor } = req.body;
+            if (!taskId || !weight_factor) {
+                res.status(400).json({ error: 'Task ID und Weight Factor sind erforderlich' });
+                return;
             }
-            catch (error) {
-                console.error('Error updating weight factor:', error);
-                res.status(500).json({ message: 'Error updating weight factor', error });
+            const weightFactorNum = parseFloat(weight_factor);
+            if (isNaN(weightFactorNum) || weightFactorNum <= 0 || weightFactorNum > 5) {
+                res.status(400).json({ error: 'Weight Factor muss zwischen 0.01 und 5.00 liegen' });
+                return;
             }
-        });
+            const success = await this.householdTaskService.updateWeightFactor(parseInt(taskId), weightFactorNum);
+            if (success) {
+                res.status(200).json({ message: 'Weight Factor erfolgreich aktualisiert' });
+            }
+            else {
+                res.status(404).json({ error: 'Hausarbeit nicht gefunden' });
+            }
+        }
+        catch (error) {
+            console.error('Error updating weight factor:', error);
+            res.status(500).json({ message: 'Error updating weight factor', error });
+        }
     }
     // User Balance Management
-    adjustUserBalance(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const { userId } = req.params;
-                const { balance } = req.body;
-                if (!userId || balance === undefined) {
-                    res.status(400).json({ error: 'User ID und Balance sind erforderlich' });
-                    return;
-                }
-                const balanceNum = parseFloat(balance);
-                if (isNaN(balanceNum)) {
-                    res.status(400).json({ error: 'Balance muss eine gültige Zahl sein' });
-                    return;
-                }
-                const success = yield this.timeAccountService.adjustUserBalance(parseInt(userId), balanceNum);
-                if (success) {
-                    res.status(200).json({ message: 'Zeitkonto erfolgreich angepasst' });
-                }
-                else {
-                    res.status(404).json({ error: 'Benutzer nicht gefunden' });
-                }
+    async adjustUserBalance(req, res) {
+        try {
+            const { userId } = req.params;
+            const { balance } = req.body;
+            if (!userId || balance === undefined) {
+                res.status(400).json({ error: 'User ID und Balance sind erforderlich' });
+                return;
             }
-            catch (error) {
-                console.error('Error adjusting user balance:', error);
-                res.status(500).json({ message: 'Error adjusting user balance', error });
+            const balanceNum = parseFloat(balance);
+            if (isNaN(balanceNum)) {
+                res.status(400).json({ error: 'Balance muss eine gültige Zahl sein' });
+                return;
             }
-        });
+            const success = await this.timeAccountService.adjustUserBalance(parseInt(userId), balanceNum);
+            if (success) {
+                res.status(200).json({ message: 'Zeitkonto erfolgreich angepasst' });
+            }
+            else {
+                res.status(404).json({ error: 'Benutzer nicht gefunden' });
+            }
+        }
+        catch (error) {
+            console.error('Error adjusting user balance:', error);
+            res.status(500).json({ message: 'Error adjusting user balance', error });
+        }
     }
 }
 exports.AdminController = AdminController;
+//# sourceMappingURL=admin.controller.js.map

@@ -21,3 +21,4 @@ exports.default = {
         expiresIn: process.env.JWT_EXPIRES_IN || '1h',
     },
 };
+//# sourceMappingURL=default.js.map

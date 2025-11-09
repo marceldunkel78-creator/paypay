@@ -16,3 +16,4 @@ const PORT = parseInt(default_1.default.server.port) || 3000;
 app_1.default.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
+//# sourceMappingURL=server.js.map

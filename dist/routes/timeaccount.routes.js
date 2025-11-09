@@ -21,3 +21,4 @@ router.get('/balance', auth_middleware_1.authMiddleware, (req, res) => timeAccou
 router.get('/transfer-history', auth_middleware_1.authMiddleware, (req, res) => timeAccountController.getTransferHistory(req, res));
 router.delete('/reset-transfer-history', auth_middleware_1.authMiddleware, (req, res) => timeAccountController.resetTransferHistory(req, res));
 exports.default = router;
+//# sourceMappingURL=timeaccount.routes.js.map

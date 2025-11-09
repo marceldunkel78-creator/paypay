@@ -1,0 +1,1 @@
+{"version":3,"file":"timeaccount.model.d.ts","sourceRoot":"","sources":["../../src/models/timeaccount.model.ts"],"names":[],"mappings":"AAAA,MAAM,WAAW,WAAW;IACxB,EAAE,CAAC,EAAE,MAAM,CAAC;IACZ,OAAO,EAAE,MAAM,CAAC;IAChB,KAAK,EAAE,MAAM,CAAC;IACd,YAAY,CAAC,EAAE,IAAI,CAAC;IACpB,MAAM,CAAC,EAAE,SAAS,GAAG,UAAU,GAAG,UAAU,CAAC;CAChD"}

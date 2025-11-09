@@ -25,3 +25,4 @@ class HouseholdTaskRoutes {
     }
 }
 exports.HouseholdTaskRoutes = HouseholdTaskRoutes;
+//# sourceMappingURL=household-task.routes.js.map

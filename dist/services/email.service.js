@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -31,69 +22,62 @@ class EmailService {
             console.warn('Email service not configured - email notifications will be skipped');
         }
     }
-    sendApprovalRequest(to, subject, html) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.isConfigured || !this.transporter) {
-                console.warn('Email service not configured - cannot send approval request');
-                return Promise.resolve();
-            }
-            const mailOptions = {
-                from: default_1.default.email.from,
-                to,
-                subject,
-                html,
-            };
-            return this.transporter.sendMail(mailOptions);
-        });
+    async sendApprovalRequest(to, subject, html) {
+        if (!this.isConfigured || !this.transporter) {
+            console.warn('Email service not configured - cannot send approval request');
+            return Promise.resolve();
+        }
+        const mailOptions = {
+            from: default_1.default.email.from,
+            to,
+            subject,
+            html,
+        };
+        return this.transporter.sendMail(mailOptions);
     }
-    sendApprovalConfirmation(to, subject = 'Request Approved', html = 'Your time account request has been approved.') {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.isConfigured || !this.transporter) {
-                console.warn('Email service not configured - cannot send approval confirmation');
-                return Promise.resolve();
-            }
-            const mailOptions = {
-                from: default_1.default.email.from,
-                to,
-                subject,
-                html,
-            };
-            return this.transporter.sendMail(mailOptions);
-        });
+    async sendApprovalConfirmation(to, subject = 'Request Approved', html = 'Your time account request has been approved.') {
+        if (!this.isConfigured || !this.transporter) {
+            console.warn('Email service not configured - cannot send approval confirmation');
+            return Promise.resolve();
+        }
+        const mailOptions = {
+            from: default_1.default.email.from,
+            to,
+            subject,
+            html,
+        };
+        return this.transporter.sendMail(mailOptions);
     }
-    sendRejectionNotification(to, subject = 'Request Rejected', html = 'Your time account request has been rejected.') {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.isConfigured || !this.transporter) {
-                console.warn('Email service not configured - cannot send rejection notification');
-                return Promise.resolve();
-            }
-            const mailOptions = {
-                from: default_1.default.email.from,
-                to,
-                subject,
-                html,
-            };
-            return this.transporter.sendMail(mailOptions);
-        });
+    async sendRejectionNotification(to, subject = 'Request Rejected', html = 'Your time account request has been rejected.') {
+        if (!this.isConfigured || !this.transporter) {
+            console.warn('Email service not configured - cannot send rejection notification');
+            return Promise.resolve();
+        }
+        const mailOptions = {
+            from: default_1.default.email.from,
+            to,
+            subject,
+            html,
+        };
+        return this.transporter.sendMail(mailOptions);
     }
     // User Registration and Approval Email Methods
-    sendNewUserRegistrationNotification(username, email) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.isConfigured || !this.transporter) {
-                console.warn('Email service not configured - cannot send new user registration notification');
-                return Promise.resolve();
-            }
-            // Get admin emails from environment variables
-            const adminEmails = [
-                process.env.ADMIN_EMAIL_1,
-                process.env.ADMIN_EMAIL_2
-            ].filter(email => email && email.includes('@'));
-            if (adminEmails.length === 0) {
-                console.log('No valid admin emails configured for new user notification');
-                return Promise.resolve();
-            }
-            const subject = `Neue Benutzerregistrierung - ${username}`;
-            const html = `
+    async sendNewUserRegistrationNotification(username, email) {
+        if (!this.isConfigured || !this.transporter) {
+            console.warn('Email service not configured - cannot send new user registration notification');
+            return Promise.resolve();
+        }
+        // Get admin emails from environment variables
+        const adminEmails = [
+            process.env.ADMIN_EMAIL_1,
+            process.env.ADMIN_EMAIL_2
+        ].filter(email => email && email.includes('@'));
+        if (adminEmails.length === 0) {
+            console.log('No valid admin emails configured for new user notification');
+            return Promise.resolve();
+        }
+        const subject = `Neue Benutzerregistrierung - ${username}`;
+        const html = `
             <h2>👤 Neue Benutzerregistrierung</h2>
             <div style="border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin: 10px 0;">
                 <p><strong>Benutzername:</strong> ${username}</p>
@@ -104,32 +88,30 @@ class EmailService {
             <p>Bitte loggen Sie sich in die Time Account Management App ein, um diese Registrierung zu genehmigen oder abzulehnen.</p>
             <p><em>Diese E-Mail wurde automatisch generiert.</em></p>
         `;
-            // Send to all admin emails
-            const promises = adminEmails.map(adminEmail => {
-                if (adminEmail && this.transporter) {
-                    const mailOptions = {
-                        from: default_1.default.email.from,
-                        to: adminEmail,
-                        subject,
-                        html,
-                    };
-                    return this.transporter.sendMail(mailOptions)
-                        .then(() => console.log(`New user registration notification sent to ${adminEmail}`))
-                        .catch(error => console.warn(`Failed to send registration notification to ${adminEmail}:`, error));
-                }
-                return Promise.resolve();
-            });
-            return Promise.all(promises);
-        });
-    }
-    sendUserApprovalConfirmation(userEmail, username) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.isConfigured || !this.transporter) {
-                console.warn('Email service not configured - cannot send user approval confirmation');
-                return Promise.resolve();
+        // Send to all admin emails
+        const promises = adminEmails.map(adminEmail => {
+            if (adminEmail && this.transporter) {
+                const mailOptions = {
+                    from: default_1.default.email.from,
+                    to: adminEmail,
+                    subject,
+                    html,
+                };
+                return this.transporter.sendMail(mailOptions)
+                    .then(() => console.log(`New user registration notification sent to ${adminEmail}`))
+                    .catch(error => console.warn(`Failed to send registration notification to ${adminEmail}:`, error));
             }
-            const subject = `Account genehmigt - Willkommen im Time Account Management System!`;
-            const html = `
+            return Promise.resolve();
+        });
+        return Promise.all(promises);
+    }
+    async sendUserApprovalConfirmation(userEmail, username) {
+        if (!this.isConfigured || !this.transporter) {
+            console.warn('Email service not configured - cannot send user approval confirmation');
+            return Promise.resolve();
+        }
+        const subject = `Account genehmigt - Willkommen im Time Account Management System!`;
+        const html = `
             <h2>🎉 Ihr Account wurde genehmigt!</h2>
             <div style="border: 1px solid #28a745; padding: 15px; border-radius: 5px; margin: 10px 0; background-color: #f8fff9;">
                 <p>Hallo <strong>${username}</strong>,</p>
@@ -149,23 +131,21 @@ class EmailService {
             <p>Viel Erfolg mit Ihrem Time Management!</p>
             <p><em>Diese E-Mail wurde automatisch generiert.</em></p>
         `;
-            const mailOptions = {
-                from: default_1.default.email.from,
-                to: userEmail,
-                subject,
-                html,
-            };
-            return this.transporter.sendMail(mailOptions);
-        });
+        const mailOptions = {
+            from: default_1.default.email.from,
+            to: userEmail,
+            subject,
+            html,
+        };
+        return this.transporter.sendMail(mailOptions);
     }
-    sendUserRejectionNotification(userEmail, username) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.isConfigured || !this.transporter) {
-                console.warn('Email service not configured - cannot send user rejection notification');
-                return Promise.resolve();
-            }
-            const subject = `Registrierung abgelehnt - Time Account Management System`;
-            const html = `
+    async sendUserRejectionNotification(userEmail, username) {
+        if (!this.isConfigured || !this.transporter) {
+            console.warn('Email service not configured - cannot send user rejection notification');
+            return Promise.resolve();
+        }
+        const subject = `Registrierung abgelehnt - Time Account Management System`;
+        const html = `
             <h2>❌ Ihre Registrierung wurde abgelehnt</h2>
             <div style="border: 1px solid #dc3545; padding: 15px; border-radius: 5px; margin: 10px 0; background-color: #fff5f5;">
                 <p>Hallo <strong>${username}</strong>,</p>
@@ -174,14 +154,14 @@ class EmailService {
             </div>
             <p><em>Diese E-Mail wurde automatisch generiert.</em></p>
         `;
-            const mailOptions = {
-                from: default_1.default.email.from,
-                to: userEmail,
-                subject,
-                html,
-            };
-            return this.transporter.sendMail(mailOptions);
-        });
+        const mailOptions = {
+            from: default_1.default.email.from,
+            to: userEmail,
+            subject,
+            html,
+        };
+        return this.transporter.sendMail(mailOptions);
     }
 }
 exports.EmailService = EmailService;
+//# sourceMappingURL=email.service.js.map

@@ -26,3 +26,4 @@ router.put('/users/:userId/balance', auth_middleware_1.authMiddleware, password_
 // Database Cleanup Routes
 router.get('/clean-duplicates', auth_middleware_1.authMiddleware, password_protect_middleware_1.passwordProtectMiddleware, cleanup_controller_1.cleanHouseholdTaskDuplicates);
 exports.default = router;
+//# sourceMappingURL=admin.routes.js.map

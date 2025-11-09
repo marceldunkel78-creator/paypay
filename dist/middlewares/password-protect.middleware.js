@@ -12,3 +12,4 @@ function passwordProtect(req, res, next) {
 }
 exports.passwordProtect = passwordProtect;
 exports.passwordProtectMiddleware = passwordProtect;
+//# sourceMappingURL=password-protect.middleware.js.map

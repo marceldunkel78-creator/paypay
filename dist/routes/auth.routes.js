@@ -10,3 +10,4 @@ router.post('/register', (req, res) => authController.register(req, res));
 router.post('/change-password', auth_middleware_1.authMiddleware, (req, res) => authController.changePassword(req, res));
 router.get('/users', auth_middleware_1.authMiddleware, (req, res) => authController.getAllUsers(req, res));
 exports.default = router;
+//# sourceMappingURL=auth.routes.js.map

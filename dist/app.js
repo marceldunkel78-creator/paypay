@@ -22,15 +22,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -95,13 +86,14 @@ app.use('/api/household-tasks', householdTaskRoutes.router); // Only JWT auth, n
 app.use('/api/admin', password_protect_middleware_1.passwordProtect, admin_routes_1.default);
 // Database connection and single migration
 (0, index_1.connectToDatabase)()
-    .then((connection) => __awaiter(void 0, void 0, void 0, function* () {
+    .then(async (connection) => {
     console.log('Database connected successfully');
     // Run single, complete migration
-    yield (0, migrate_complete_1.runCompleteMigration)();
+    await (0, migrate_complete_1.runCompleteMigration)();
     console.log('All migrations completed successfully');
-}))
+})
     .catch((error) => {
     console.error('Database connection failed:', error);
 });
 exports.default = app;
+//# sourceMappingURL=app.js.map
