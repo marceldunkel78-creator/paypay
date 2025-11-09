@@ -156,11 +156,11 @@ class TimeAccountService {
             if (balances.length > 0) {
                 return parseFloat(balances[0].current_balance);
             }
-            // Falls kein Eintrag existiert, berechne aus time_entries
+            // Falls kein Eintrag existiert, berechne aus time_entries (nur genehmigte!)
             const [entryRows] = await connection.execute(`
                 SELECT SUM(hours) as total_hours 
                 FROM time_entries 
-                WHERE user_id = ?
+                WHERE user_id = ? AND status = 'approved'
             `, [userId]);
             const entries = entryRows;
             const calculatedBalance = entries.length > 0 ? parseFloat(entries[0].total_hours || '0') : 0;
