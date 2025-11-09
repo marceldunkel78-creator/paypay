@@ -158,5 +158,19 @@ class TimeAccountController {
             }
         });
     }
+    // Transfer-Historie zurücksetzen
+    resetTransferHistory(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const userId = req.user.id; // aus auth middleware
+                yield this.timeAccountService.resetTransferHistory(parseInt(userId));
+                res.status(200).json({ message: 'Transfer-Historie erfolgreich zurückgesetzt' });
+            }
+            catch (error) {
+                console.error('Reset transfer history error:', error);
+                res.status(500).json({ message: 'Error resetting transfer history' });
+            }
+        });
+    }
 }
 exports.TimeAccountController = TimeAccountController;

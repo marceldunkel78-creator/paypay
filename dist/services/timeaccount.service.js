@@ -247,5 +247,18 @@ class TimeAccountService {
             }
         });
     }
+    // Transfer-Historie für einen User zurücksetzen
+    resetTransferHistory(userId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const connection = yield (0, index_1.connectToDatabase)();
+            try {
+                yield connection.execute('DELETE FROM time_transfers WHERE from_user_id = ? OR to_user_id = ?', [userId, userId]);
+            }
+            catch (error) {
+                console.error('Error resetting transfer history:', error);
+                throw new Error('Failed to reset transfer history');
+            }
+        });
+    }
 }
 exports.TimeAccountService = TimeAccountService;

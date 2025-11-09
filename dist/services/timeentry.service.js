@@ -42,8 +42,11 @@ class TimeEntryService {
                         finalHours = calculatedHours;
                     }
                     else if (timeEntry.entry_type === 'screen_time') {
-                        // Alte Logik für Bildschirmzeit: negative fixe Stunden
-                        finalHours = -Math.abs(task.hours);
+                        // Bildschirmzeit: verwende input_minutes mit weight_factor (als negative Stunden)
+                        const inputMinutes = timeEntry.input_minutes || 0;
+                        const weightFactor = task.weight_factor;
+                        calculatedHours = (inputMinutes * weightFactor) / 60;
+                        finalHours = -Math.abs(calculatedHours); // Negativ für Bildschirmzeit
                     }
                     else {
                         throw new Error('Ungültige Eingabe für task-basierte Zeiterfassung');
@@ -94,7 +97,7 @@ class TimeEntryService {
                 const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
                 let query = `
                 SELECT te.id, te.user_id, te.task_id, te.hours, te.entry_type, te.description, 
-                       te.status, te.created_at, te.approved_at, te.approved_by,
+                       te.status, te.created_at,
                        te.input_minutes, te.calculated_hours,
                        ht.name as task_name
                 FROM time_entries te
@@ -117,8 +120,6 @@ class TimeEntryService {
                     description: row.description,
                     status: row.status,
                     created_at: new Date(row.created_at),
-                    approved_at: row.approved_at ? new Date(row.approved_at) : undefined,
-                    approved_by: row.approved_by,
                     input_minutes: row.input_minutes,
                     calculated_hours: row.calculated_hours ? parseFloat(row.calculated_hours) : null,
                     task_name: row.task_name // Name der Hausarbeit
@@ -341,10 +342,10 @@ class TimeEntryService {
                 // Eintrag auf genehmigt setzen
                 const updateQuery = `
                 UPDATE time_entries 
-                SET status = 'approved', approved_at = CURRENT_TIMESTAMP, approved_by = ?
+                SET status = 'approved'
                 WHERE id = ? AND status = 'pending'
             `;
-                const [result] = yield db.execute(updateQuery, [adminUserId, entryId]);
+                const [result] = yield db.execute(updateQuery, [entryId]);
                 if (result.affectedRows > 0) {
                     // Balance aktualisieren
                     yield this.updateUserBalance(userId, hours);
@@ -365,10 +366,10 @@ class TimeEntryService {
                 const db = yield (0, db_1.connectToDatabase)();
                 const query = `
                 UPDATE time_entries 
-                SET status = 'rejected', approved_at = CURRENT_TIMESTAMP, approved_by = ?
+                SET status = 'rejected'
                 WHERE id = ? AND status = 'pending'
             `;
-                const [result] = yield db.execute(query, [adminUserId, entryId]);
+                const [result] = yield db.execute(query, [entryId]);
                 return result.affectedRows > 0;
             }
             catch (error) {
@@ -398,10 +399,10 @@ class TimeEntryService {
                 // Eintrag aktualisieren und genehmigen
                 const updateQuery = `
                 UPDATE time_entries 
-                SET hours = ?, status = 'approved', approved_at = CURRENT_TIMESTAMP, approved_by = ?
+                SET hours = ?, status = 'approved'
                 WHERE id = ?
             `;
-                const [result] = yield db.execute(updateQuery, [hours, adminUserId, entryId]);
+                const [result] = yield db.execute(updateQuery, [hours, entryId]);
                 if (result.affectedRows > 0) {
                     // Balance aktualisieren
                     if (oldStatus === 'approved') {
@@ -451,11 +452,11 @@ class TimeEntryService {
                 const updateQuery = `
                 UPDATE time_entries 
                 SET input_minutes = ?, calculated_hours = ?, hours = ?, 
-                    status = 'approved', approved_at = CURRENT_TIMESTAMP, approved_by = ?
+                    status = 'approved'
                 WHERE id = ?
             `;
                 const [result] = yield db.execute(updateQuery, [
-                    inputMinutes, calculatedHours, calculatedHours, adminUserId, entryId
+                    inputMinutes, calculatedHours, calculatedHours, entryId
                 ]);
                 if (result.affectedRows > 0) {
                     // Balance aktualisieren

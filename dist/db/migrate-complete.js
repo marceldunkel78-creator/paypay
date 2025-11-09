@@ -36,6 +36,73 @@ exports.runCompleteMigration = void 0;
 const index_1 = require("./index");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+function parseSQLStatements(sql) {
+    const statements = [];
+    let currentStatement = '';
+    let inString = false;
+    let stringDelimiter = '';
+    const lines = sql.split('\n');
+    for (let line of lines) {
+        // Entferne führende und nachfolgende Leerzeichen
+        line = line.trim();
+        // Überspringe leere Zeilen
+        if (!line)
+            continue;
+        // Überspringe Kommentarzeilen
+        if (line.startsWith('--'))
+            continue;
+        let i = 0;
+        while (i < line.length) {
+            const char = line[i];
+            const nextChar = line[i + 1];
+            // SQL-Kommentar erkennen
+            if (!inString && char === '-' && nextChar === '-') {
+                // Rest der Zeile ist Kommentar
+                break;
+            }
+            // String-Literale erkennen
+            if ((char === "'" || char === '"' || char === '`')) {
+                if (!inString) {
+                    inString = true;
+                    stringDelimiter = char;
+                }
+                else if (char === stringDelimiter) {
+                    // Prüfe auf escaped quotes
+                    if (line[i - 1] !== '\\') {
+                        inString = false;
+                        stringDelimiter = '';
+                    }
+                }
+            }
+            // Semikolon als Statement-Ende erkennen
+            if (!inString && char === ';') {
+                currentStatement += char;
+                const trimmedStatement = currentStatement.trim();
+                if (trimmedStatement && trimmedStatement.length > 1) {
+                    statements.push(trimmedStatement);
+                }
+                currentStatement = '';
+                i++;
+                continue;
+            }
+            currentStatement += char;
+            i++;
+        }
+        // Füge Zeilenumbruch hinzu, wenn wir nicht am Ende eines Statements sind
+        if (currentStatement.trim()) {
+            currentStatement += '\n';
+        }
+    }
+    // Letztes Statement hinzufügen, falls vorhanden
+    const finalStatement = currentStatement.trim();
+    if (finalStatement && finalStatement.length > 1) {
+        statements.push(finalStatement);
+    }
+    return statements.filter(stmt => {
+        const trimmed = stmt.trim();
+        return trimmed.length > 1 && !trimmed.startsWith('--');
+    });
+}
 function runCompleteMigration() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -44,13 +111,11 @@ function runCompleteMigration() {
             // Lade die konsolidierte SQL-Datei
             const sqlPath = path.join(__dirname, '../../migrations/complete-database-setup.sql');
             const migrationSQL = fs.readFileSync(sqlPath, 'utf8');
-            // Teile die SQL-Befehle auf (getrennt durch Semikolon)
-            const statements = migrationSQL
-                .split(';')
-                .map(stmt => stmt.trim())
-                .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
+            // Erweiterte SQL-Parsing: Berücksichtige mehrzeilige Statements und Kommentare
+            const statements = parseSQLStatements(migrationSQL);
             console.log(`Executing ${statements.length} SQL statements...`);
             // Führe jeden SQL-Befehl einzeln aus
+            let executedCount = 0;
             for (let i = 0; i < statements.length; i++) {
                 const statement = statements[i];
                 // Überspringe Kommentare und leere Zeilen
@@ -58,16 +123,38 @@ function runCompleteMigration() {
                     continue;
                 }
                 try {
-                    console.log(`Executing statement ${i + 1}/${statements.length}...`);
-                    yield connection.execute(statement);
+                    // Debug: Zeige ersten Teil des Statements
+                    const preview = statement.length > 100 ? statement.substring(0, 100) + '...' : statement;
+                    console.log(`Executing statement ${i + 1}/${statements.length}: ${preview}`);
+                    // Verwende query() für Statements, die nicht mit prepared statements funktionieren
+                    if (statement.trim().toUpperCase().startsWith('ALTER DATABASE') ||
+                        statement.trim().toUpperCase().startsWith('SET FOREIGN_KEY_CHECKS') ||
+                        statement.trim().toUpperCase().startsWith('USE ')) {
+                        yield connection.query(statement);
+                    }
+                    else {
+                        yield connection.execute(statement);
+                    }
+                    executedCount++;
                 }
                 catch (error) {
-                    // Ignoriere "Already exists" Fehler, aber logge andere
-                    if (error instanceof Error && !error.message.includes('already exists')) {
-                        console.warn(`Warning in statement ${i + 1}:`, error.message);
+                    console.error(`Error in statement ${i + 1}:`, statement.substring(0, 200));
+                    console.error(`Error message:`, error);
+                    // Ignoriere bestimmte erwartete Fehler
+                    if (error instanceof Error &&
+                        (error.message.includes('already exists') ||
+                            error.message.includes('Table') && error.message.includes('already exists') ||
+                            error.message.includes('Duplicate column name') ||
+                            error.message.includes('duplicate column name'))) {
+                        console.log('Skipping already exists/duplicate column error...');
+                    }
+                    else {
+                        // Bei anderen Fehlern: Warning, aber weitermachen
+                        console.warn(`Warning in statement ${i + 1}:`, error);
                     }
                 }
             }
+            console.log(`Executed ${executedCount} SQL statements successfully.`);
             console.log('Complete database migration completed successfully!');
         }
         catch (error) {

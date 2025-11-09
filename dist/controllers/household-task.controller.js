@@ -76,23 +76,20 @@ class HouseholdTaskController {
         var _a;
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { name, hours, weight_factor, is_active } = req.body;
+                const { name, description, hours, weight_factor, is_active } = req.body;
                 const user_role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
                 if (user_role !== 'admin') {
                     res.status(403).json({ error: 'Keine Berechtigung' });
                     return;
                 }
-                if (!name || hours === undefined) {
-                    res.status(400).json({ error: 'Name und Stunden sind erforderlich' });
-                    return;
-                }
-                if (hours < 0 || hours > 24) {
-                    res.status(400).json({ error: 'Stunden müssen zwischen 0 und 24 liegen' });
+                if (!name || typeof name !== 'string' || name.trim().length === 0) {
+                    res.status(400).json({ error: 'Name ist erforderlich' });
                     return;
                 }
                 const taskData = {
                     name: name.trim(),
-                    hours: parseFloat(hours),
+                    description: description || '',
+                    hours: hours ? parseFloat(hours) : null,
                     weight_factor: weight_factor ? parseFloat(weight_factor) : 1.00,
                     is_active: is_active !== null && is_active !== void 0 ? is_active : true
                 };
@@ -115,7 +112,7 @@ class HouseholdTaskController {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { id } = req.params;
-                const { name, hours, weight_factor, is_active } = req.body;
+                const { name, description, hours, weight_factor, is_active } = req.body;
                 const user_role = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
                 if (user_role !== 'admin') {
                     res.status(403).json({ error: 'Keine Berechtigung' });
@@ -125,11 +122,10 @@ class HouseholdTaskController {
                 if (name !== undefined) {
                     updateData.name = name.trim();
                 }
+                if (description !== undefined) {
+                    updateData.description = description;
+                }
                 if (hours !== undefined) {
-                    if (hours < 0 || hours > 24) {
-                        res.status(400).json({ error: 'Stunden müssen zwischen 0 und 24 liegen' });
-                        return;
-                    }
                     updateData.hours = parseFloat(hours);
                 }
                 if (is_active !== undefined) {

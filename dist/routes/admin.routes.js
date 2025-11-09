@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const admin_controller_1 = require("../controllers/admin.controller");
+const cleanup_controller_1 = require("../controllers/cleanup.controller");
 const auth_middleware_1 = require("../middlewares/auth.middleware");
 const password_protect_middleware_1 = require("../middlewares/password-protect.middleware");
 const router = (0, express_1.Router)();
@@ -22,4 +23,6 @@ router.get('/household-tasks', auth_middleware_1.authMiddleware, password_protec
 router.put('/household-tasks/:taskId/weight-factor', auth_middleware_1.authMiddleware, password_protect_middleware_1.passwordProtectMiddleware, (req, res) => adminController.updateWeightFactor(req, res));
 // User Balance Management Routes
 router.put('/users/:userId/balance', auth_middleware_1.authMiddleware, password_protect_middleware_1.passwordProtectMiddleware, (req, res) => adminController.adjustUserBalance(req, res));
+// Database Cleanup Routes
+router.get('/clean-duplicates', auth_middleware_1.authMiddleware, password_protect_middleware_1.passwordProtectMiddleware, cleanup_controller_1.cleanHouseholdTaskDuplicates);
 exports.default = router;

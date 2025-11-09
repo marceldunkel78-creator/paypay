@@ -19,4 +19,5 @@ router.delete('/time-accounts/:id', auth_middleware_1.authMiddleware, (req, res)
 router.post('/transfer-hours', auth_middleware_1.authMiddleware, (req, res) => timeAccountController.transferHours(req, res));
 router.get('/balance', auth_middleware_1.authMiddleware, (req, res) => timeAccountController.getUserBalance(req, res));
 router.get('/transfer-history', auth_middleware_1.authMiddleware, (req, res) => timeAccountController.getTransferHistory(req, res));
+router.delete('/reset-transfer-history', auth_middleware_1.authMiddleware, (req, res) => timeAccountController.resetTransferHistory(req, res));
 exports.default = router;

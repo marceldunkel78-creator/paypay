@@ -18,7 +18,7 @@ class HouseholdTaskService {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
                 const query = `
-                SELECT id, name, hours, weight_factor, is_active, created_at, updated_at
+                SELECT id, name, description, hours, weight_factor, is_active, created_at, updated_at
                 FROM household_tasks 
                 WHERE is_active = 1 
                 ORDER BY name ASC
@@ -27,7 +27,8 @@ class HouseholdTaskService {
                 return rows.map((row) => ({
                     id: row.id,
                     name: row.name,
-                    hours: parseFloat(row.hours),
+                    description: row.description,
+                    hours: row.hours ? parseFloat(row.hours) : null,
                     weight_factor: parseFloat(row.weight_factor),
                     is_active: row.is_active,
                     created_at: new Date(row.created_at),
@@ -46,7 +47,7 @@ class HouseholdTaskService {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
                 const query = `
-                SELECT id, name, hours, weight_factor, is_active, created_at, updated_at
+                SELECT id, name, description, hours, weight_factor, is_active, created_at, updated_at
                 FROM household_tasks 
                 ORDER BY name ASC
             `;
@@ -54,7 +55,8 @@ class HouseholdTaskService {
                 return rows.map((row) => ({
                     id: row.id,
                     name: row.name,
-                    hours: parseFloat(row.hours),
+                    description: row.description,
+                    hours: row.hours ? parseFloat(row.hours) : null,
                     weight_factor: parseFloat(row.weight_factor),
                     is_active: row.is_active,
                     created_at: new Date(row.created_at),
@@ -73,7 +75,7 @@ class HouseholdTaskService {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
                 const query = `
-                SELECT id, name, hours, weight_factor, is_active, created_at, updated_at
+                SELECT id, name, description, hours, weight_factor, is_active, created_at, updated_at
                 FROM household_tasks 
                 WHERE id = ?
             `;
@@ -85,7 +87,8 @@ class HouseholdTaskService {
                 return {
                     id: row.id,
                     name: row.name,
-                    hours: parseFloat(row.hours),
+                    description: row.description,
+                    hours: row.hours ? parseFloat(row.hours) : null,
                     weight_factor: parseFloat(row.weight_factor),
                     is_active: row.is_active,
                     created_at: new Date(row.created_at),
@@ -100,15 +103,15 @@ class HouseholdTaskService {
     }
     // Neue Hausarbeit erstellen (Admin)
     createHouseholdTask(taskData) {
-        var _a, _b;
+        var _a, _b, _c, _d;
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const db = yield (0, db_1.connectToDatabase)();
                 const query = `
-                INSERT INTO household_tasks (name, hours, weight_factor, is_active)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO household_tasks (name, description, hours, weight_factor, is_active)
+                VALUES (?, ?, ?, ?, ?)
             `;
-                const [result] = yield db.execute(query, [taskData.name, taskData.hours, (_a = taskData.weight_factor) !== null && _a !== void 0 ? _a : 1.00, (_b = taskData.is_active) !== null && _b !== void 0 ? _b : true]);
+                const [result] = yield db.execute(query, [taskData.name, (_a = taskData.description) !== null && _a !== void 0 ? _a : null, (_b = taskData.hours) !== null && _b !== void 0 ? _b : null, (_c = taskData.weight_factor) !== null && _c !== void 0 ? _c : 1.00, (_d = taskData.is_active) !== null && _d !== void 0 ? _d : true]);
                 console.log('Household task created:', result.insertId);
                 // Neu erstellte Hausarbeit zurückgeben
                 const createdTask = yield this.getHouseholdTaskById(result.insertId);
@@ -137,6 +140,10 @@ class HouseholdTaskService {
                 if (updateData.name !== undefined) {
                     updateFields.push('name = ?');
                     updateValues.push(updateData.name);
+                }
+                if (updateData.description !== undefined) {
+                    updateFields.push('description = ?');
+                    updateValues.push(updateData.description);
                 }
                 if (updateData.hours !== undefined) {
                     updateFields.push('hours = ?');
