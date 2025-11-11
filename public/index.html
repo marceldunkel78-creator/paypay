@@ -77,7 +77,7 @@
                 <h2>💰 Aktueller Zeitkontostand</h2>
                 <div class="balance-display">
                     <span class="balance-amount" id="currentBalance">0.00</span>
-                    <span class="balance-unit">Stunden</span>
+                    <span class="balance-unit">Minuten</span>
                 </div>
                 <div class="balance-actions">
                     <button onclick="openTransferModal()" class="btn btn-gift">
@@ -118,8 +118,8 @@
 
                     <!-- Manual Time Input for Screen Time -->
                     <div id="manualTimeGroup" class="form-group" style="display: none;">
-                        <label for="manualHours">Bildschirmzeit (Stunden):</label>
-                        <input type="number" id="manualHours" step="0.25" min="0" max="24" placeholder="z.B. 2.5">
+                        <label for="manualHours">Bildschirmzeit (Minuten):</label>
+                        <input type="number" id="manualHours" step="1" min="1" max="1440" placeholder="z.B. 30">
                         <small class="manual-hours-display">Zeitwert: wird als negative Zeit gerechnet</small>
                     </div>
                     <div class="form-group">
@@ -260,8 +260,8 @@
                                     <input type="text" id="taskName" required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="taskHours">Referenz-Stunden:</label>
-                                    <input type="number" id="taskHours" step="0.25" min="0" max="24" required>
+                                    <label for="taskHours">Referenz-Minuten:</label>
+                                    <input type="number" id="taskHours" step="1" min="1" max="1440" required>
                                 </div>
                                 <div class="form-group">
                                     <label for="taskWeightFactor">Zeitgewichtung:</label>
@@ -335,8 +335,8 @@
                     <input type="text" id="editTaskName" required>
                 </div>
                 <div class="form-group">
-                    <label for="editTaskHours">Referenz-Stunden:</label>
-                    <input type="number" id="editTaskHours" step="0.25" min="0" max="24" required>
+                    <label for="editTaskHours">Referenz-Minuten:</label>
+                    <input type="number" id="editTaskHours" step="1" min="1" max="1440" required>
                 </div>
                 <div class="form-group">
                     <label for="editTaskWeightFactor">Zeitgewichtung:</label>
@@ -367,11 +367,20 @@
             
             <form onsubmit="submitBalanceAdjustment(event)">
                 <div class="form-group">
-                    <label for="newBalanceInput">Neuer Kontostand (in Stunden):</label>
-                    <input type="number" id="newBalanceInput" step="0.25" required 
-                           placeholder="z.B. 5.5 oder -2.25">
+                    <label for="newBalanceInput">Neuer Kontostand (in Minuten):</label>
+                    <input type="number" id="newBalanceInput" step="1" required 
+                           placeholder="z.B. 330 oder -135">
                     <small class="form-help">
-                        Geben Sie den neuen Kontostand ein. Positive Werte für Guthaben, negative für Schulden.
+                        Geben Sie den neuen Kontostand in Minuten ein. Positive Werte für Guthaben, negative für Schulden.
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="balanceReasonInput">Grund für die Anpassung (optional):</label>
+                    <input type="text" id="balanceReasonInput" 
+                           placeholder="z.B. Nachträgliche Korrektur, Bonus, etc.">
+                    <small class="form-help">
+                        Dieser Grund erscheint im automatisch erstellten Zeiteintrag.
                     </small>
                 </div>
                 
@@ -418,11 +427,11 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="transferHoursInput">Stunden verschenken:</label>
-                    <input type="number" id="transferHoursInput" step="0.25" min="0.25" required 
-                           placeholder="z.B. 2.5">
+                    <label for="transferHoursInput">Minuten verschenken:</label>
+                    <input type="number" id="transferHoursInput" step="1" min="1" required 
+                           placeholder="z.B. 150">
                     <small class="form-help">
-                        Geben Sie die Anzahl Stunden ein, die Sie verschenken möchten.
+                        Geben Sie die Anzahl Minuten ein, die Sie verschenken möchten.
                     </small>
                 </div>
                 

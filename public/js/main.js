@@ -245,8 +245,10 @@ function populateHouseholdTaskDropdown() {
     householdTasks.forEach(task => {
         const option = document.createElement('option');
         option.value = task.id;
-        option.textContent = `${task.name} (${task.hours}h, Faktor ${task.weight_factor})`;
-        option.dataset.hours = task.hours;
+        const taskMinutes = Math.round(task.hours * 60);
+        option.textContent = `${task.name} (${taskMinutes} min, Faktor ${task.weight_factor})`;
+        option.dataset.hours = task.hours; // Keep hours for backend calculations
+        option.dataset.minutes = taskMinutes; // Add minutes for display
         option.dataset.weightFactor = task.weight_factor;
         option.dataset.description = task.description || '';
         dropdown.appendChild(option);
@@ -310,12 +312,12 @@ function updateTaskDisplay() {
     
     if (entryType === 'screen_time') {
         // Handle manual time input display for screen time
-        const manualHours = document.getElementById('manualHours').value;
+        const manualMinutes = document.getElementById('manualHours').value; // Jetzt Minuten-Eingabe
         const manualDisplay = document.querySelector('.manual-hours-display');
         if (manualDisplay) {
-            if (manualHours && parseFloat(manualHours) > 0) {
-                const hours = parseFloat(manualHours);
-                manualDisplay.textContent = `Zeitwert: -${hours}h (negative Zeit)`;
+            if (manualMinutes && parseFloat(manualMinutes) > 0) {
+                const minutes = parseFloat(manualMinutes);
+                manualDisplay.textContent = `Zeitwert: -${minutes} min (negative Zeit)`;
                 manualDisplay.style.color = '#ef4444';
             } else {
                 manualDisplay.textContent = 'Zeitwert: wird als negative Zeit gerechnet';
@@ -341,11 +343,12 @@ function updateTaskDisplay() {
             }
         } else {
             const hours = parseFloat(selectedOption.dataset.hours);
+            const minutes = parseInt(selectedOption.dataset.minutes || Math.round(hours * 60));
             const weightFactor = parseFloat(selectedOption.dataset.weightFactor);
             const description = selectedOption.dataset.description;
             
             display.innerHTML = `
-                <strong>Referenz:</strong> ${hours}h | <strong>Faktor:</strong> ${weightFactor}<br>
+                <strong>Referenz:</strong> ${minutes} min | <strong>Faktor:</strong> ${weightFactor}<br>
                 <em>${description}</em>
             `;
             display.style.color = '#10b981';
@@ -428,12 +431,13 @@ async function createTimeEntry(event) {
             return;
         }
     } else if (entryType === 'screen_time') {
-        // Screen time uses manual input
-        manualHours = parseFloat(document.getElementById('manualHours').value);
-        if (!manualHours || manualHours <= 0) {
-            showMessage('Bitte geben Sie eine gültige Stundenzahl ein', 'error');
+        // Screen time uses manual input (jetzt in Minuten)
+        const manualMinutes = parseFloat(document.getElementById('manualHours').value);
+        if (!manualMinutes || manualMinutes <= 0) {
+            showMessage('Bitte geben Sie eine gültige Minutenzahl ein', 'error');
             return;
         }
+        manualHours = manualMinutes / 60; // Konvertiere zu Stunden für Backend
     }
     
     try {
@@ -541,7 +545,8 @@ async function loadTimeEntries() {
 function updateBalanceDisplay() {
     const balanceElement = document.getElementById('currentBalance');
     if (balanceElement) {
-        balanceElement.textContent = userTimeBalance.toFixed(2);
+        const balanceInMinutes = Math.round(userTimeBalance * 60); // Konvertiere zu Minuten
+        balanceElement.textContent = `${balanceInMinutes} min`;
         balanceElement.className = userTimeBalance >= 0 ? 'balance-positive' : 'balance-negative';
     }
 }
@@ -559,7 +564,8 @@ function displayTimeEntries(entries) {
         const date = new Date(entry.created_at).toLocaleDateString('de-DE');
         const time = new Date(entry.created_at).toLocaleTimeString('de-DE');
         const typeLabel = entry.entry_type === 'productive' ? 'Produktive Zeit' : 'Bildschirmzeit';
-        const hoursDisplay = entry.hours >= 0 ? `+${entry.hours}h` : `${entry.hours}h`;
+        const minutesDisplay = Math.round(entry.hours * 60); // Konvertiere zu Minuten
+        const hoursDisplay = entry.hours >= 0 ? `+${minutesDisplay} min` : `${minutesDisplay} min`;
         
         let statusClass = 'entry-pending';
         let statusLabel = 'Wartet auf Genehmigung';
@@ -617,6 +623,24 @@ async function deleteTimeEntry(entryId) {
     }
 }
 
+// Hilfsfunktion zum Formatieren von Stunden zu "h:min"
+function formatHoursToHourMin(hours) {
+    if (hours === 0) return '0:00';
+    
+    const isNegative = hours < 0;
+    const absHours = Math.abs(hours);
+    const fullHours = Math.floor(absHours);
+    const minutes = Math.round((absHours - fullHours) * 60);
+    
+    // Handle case where rounding minutes results in 60
+    if (minutes === 60) {
+        return `${isNegative ? '-' : ''}${fullHours + 1}:00`;
+    }
+    
+    const formattedMinutes = minutes.toString().padStart(2, '0');
+    return `${isNegative ? '-' : ''}${fullHours}:${formattedMinutes}`;
+}
+
 // Admin Functions
 async function loadAdminStatistics() {
     try {
@@ -648,7 +672,8 @@ function displayAdminStatistics(statistics) {
     
     const statsHTML = statistics.map(stat => {
         const balanceClass = stat.current_balance >= 0 ? 'balance-positive' : 'balance-negative';
-        const balanceDisplay = stat.current_balance >= 0 ? `+${stat.current_balance.toFixed(2)}h` : `${stat.current_balance.toFixed(2)}h`;
+        const balanceFormatted = formatHoursToHourMin(stat.current_balance);
+        const balanceDisplay = stat.current_balance >= 0 ? `+${balanceFormatted}` : balanceFormatted;
         
         return `
             <div class="user-stat-card">
@@ -670,11 +695,11 @@ function displayAdminStatistics(statistics) {
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Produktive Zeit:</span>
-                        <span class="stat-value productive">+${stat.productive_hours.toFixed(2)}h</span>
+                        <span class="stat-value productive">+${formatHoursToHourMin(stat.productive_hours)}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Bildschirmzeit:</span>
-                        <span class="stat-value screen-time">-${stat.screen_time_hours.toFixed(2)}h</span>
+                        <span class="stat-value screen-time">-${formatHoursToHourMin(stat.screen_time_hours)}</span>
                     </div>
                 </div>
             </div>
@@ -717,13 +742,9 @@ function displayPendingEntries(entries) {
         const time = new Date(entry.created_at).toLocaleTimeString('de-DE');
         const typeLabel = entry.entry_type === 'productive' ? 'Produktive Zeit' : 'Bildschirmzeit';
         
-        // Für Weight Factor Einträge: Minuten anzeigen, für andere: Stunden
-        let timeDisplay;
-        if (entry.input_minutes && entry.entry_type === 'productive') {
-            timeDisplay = `${entry.input_minutes} min`;
-        } else {
-            timeDisplay = entry.hours >= 0 ? `+${entry.hours}h` : `${entry.hours}h`;
-        }
+        // Alle Einträge in Minuten anzeigen
+        const minutes = Math.round(entry.hours * 60);
+        const timeDisplay = entry.hours >= 0 ? `+${minutes} min` : `${minutes} min`;
         
         return `
             <div class="pending-entry">
@@ -737,10 +758,7 @@ function displayPendingEntries(entries) {
                     <small class="pending-timestamp">${date} um ${time}</small>
                 </div>
                 <div class="pending-actions">
-                    ${entry.input_minutes && entry.entry_type === 'productive' ? 
-                        `<input type="number" id="minutes-${entry.id}" value="${entry.input_minutes}" step="1" min="1" class="minutes-input" placeholder="Minuten"> min` :
-                        `<input type="number" id="hours-${entry.id}" value="${entry.hours}" step="0.25" class="hours-input" placeholder="Stunden"> h`
-                    }
+                    <input type="number" id="minutes-${entry.id}" value="${minutes}" step="1" class="minutes-input" placeholder="Minuten"> min
                     <button onclick="approveEntry(${entry.id})" class="btn btn-success">✓ Genehmigen</button>
                     <button onclick="rejectEntry(${entry.id})" class="btn btn-danger">✗ Ablehnen</button>
                     <button onclick="updateEntry(${entry.id})" class="btn btn-warning">📝 Ändern</button>
@@ -813,7 +831,8 @@ function generateUserEntriesHTML(entries) {
         const date = new Date(entry.created_at).toLocaleDateString('de-DE');
         const time = new Date(entry.created_at).toLocaleTimeString('de-DE');
         const typeLabel = entry.entry_type === 'productive' ? 'Produktive Zeit' : 'Bildschirmzeit';
-        const hoursDisplay = entry.hours >= 0 ? `+${entry.hours}h` : `${entry.hours}h`;
+        const minutes = Math.round(entry.hours * 60);
+        const hoursDisplay = entry.hours >= 0 ? `+${minutes} min` : `${minutes} min`;
         
         let statusClass = 'entry-pending';
         let statusLabel = 'Wartet auf Genehmigung';
@@ -832,9 +851,10 @@ function generateUserEntriesHTML(entries) {
             statusClass = 'entry-rejected';
             statusLabel = 'Abgelehnt';
         } else if (entry.status === 'pending') {
+            const inputMinutes = Math.round(entry.hours * 60);
             actionButtons = `
                 <div class="modal-entry-actions">
-                    <input type="number" id="modal-hours-${entry.id}" value="${entry.hours}" step="0.25" class="hours-input">
+                    <input type="number" id="modal-hours-${entry.id}" value="${inputMinutes}" step="1" class="hours-input" title="Minuten">
                     <button onclick="approveEntryFromModal(${entry.id})" class="btn btn-success">✓ Genehmigen</button>
                     <button onclick="rejectEntryFromModal(${entry.id})" class="btn btn-danger">✗ Ablehnen</button>
                     <button onclick="updateEntryFromModal(${entry.id})" class="btn btn-warning">📝 Ändern</button>
@@ -917,13 +937,15 @@ async function rejectEntryFromModal(entryId) {
 }
 
 async function updateEntryFromModal(entryId) {
-    const hoursInput = document.getElementById(`modal-hours-${entryId}`);
-    const newHours = parseFloat(hoursInput.value);
+    const minutesInput = document.getElementById(`modal-hours-${entryId}`);
+    const newMinutes = parseInt(minutesInput.value);
     
-    if (isNaN(newHours)) {
-        showMessage('Ungültige Stundenanzahl', 'error');
+    if (isNaN(newMinutes)) {
+        showMessage('Ungültige Minutenanzahl', 'error');
         return;
     }
+    
+    const newHours = newMinutes / 60; // Convert minutes to hours for backend
     
     try {
         const response = await fetch(`${API_BASE}/timeentries/admin/update/${entryId}`, {
@@ -999,30 +1021,21 @@ async function rejectEntry(entryId) {
 
 async function updateEntry(entryId) {
     const minutesInput = document.getElementById(`minutes-${entryId}`);
-    const hoursInput = document.getElementById(`hours-${entryId}`);
     
-    let requestBody;
-    
-    if (minutesInput) {
-        // Weight Factor Eintrag - Minuten verwenden
-        const newMinutes = parseInt(minutesInput.value);
-        if (isNaN(newMinutes) || newMinutes <= 0) {
-            showMessage('Ungültige Minutenanzahl', 'error');
-            return;
-        }
-        requestBody = { input_minutes: newMinutes };
-    } else if (hoursInput) {
-        // Legacy Eintrag - Stunden verwenden  
-        const newHours = parseFloat(hoursInput.value);
-        if (isNaN(newHours)) {
-            showMessage('Ungültige Stundenanzahl', 'error');
-            return;
-        }
-        requestBody = { hours: newHours };
-    } else {
+    if (!minutesInput) {
         showMessage('Eingabefeld nicht gefunden', 'error');
         return;
     }
+    
+    const newMinutes = parseInt(minutesInput.value);
+    if (isNaN(newMinutes)) {
+        showMessage('Ungültige Minutenanzahl', 'error');
+        return;
+    }
+    
+    // Convert minutes to hours for backend
+    const newHours = newMinutes / 60;
+    const requestBody = { hours: newHours };
     
     try {
         const response = await fetch(`${API_BASE}/timeentries/admin/update/${entryId}`, {
@@ -1482,7 +1495,7 @@ function displayAdminHouseholdTasks(tasks) {
             <div class="task-info">
                 <h4>${task.name}</h4>
                 <div class="task-details">
-                    <span class="task-hours">${task.hours} Std (Referenz)</span>
+                    <span class="task-hours">${Math.round(task.hours * 60)} min (Referenz)</span>
                     <span class="task-weight-factor">Faktor: ${(task.weight_factor || 1.00).toFixed(2)}x</span>
                 </div>
                 <span class="task-status ${task.is_active ? 'active' : 'inactive'}">
@@ -1512,7 +1525,7 @@ async function createHouseholdTask(event) {
     const weightFactorInput = document.getElementById('taskWeightFactor');
     
     const name = nameInput.value.trim();
-    const hours = parseFloat(hoursInput.value);
+    const minutes = parseInt(hoursInput.value);
     const weight_factor = parseFloat(weightFactorInput.value);
     
     if (!name) {
@@ -1520,10 +1533,12 @@ async function createHouseholdTask(event) {
         return;
     }
     
-    if (!hours || hours <= 0) {
-        showMessage('Bitte geben Sie eine gültige Stundenzahl ein', 'error');
+    if (!minutes || minutes <= 0) {
+        showMessage('Bitte geben Sie eine gültige Minutenzahl ein', 'error');
         return;
     }
+    
+    const hours = minutes / 60; // Convert minutes to hours for backend
     
     if (!weight_factor || weight_factor <= 0 || weight_factor > 5) {
         showMessage('Bitte geben Sie einen gültigen Zeitgewichtungsfaktor ein (0.01 - 5.00)', 'error');
@@ -1573,9 +1588,9 @@ async function editHouseholdTask(taskId) {
         
         if (response.ok) {
             const task = await response.json();
-            // Modal mit aktuellen Werten füllen
+            // Modal mit aktuellen Werten füllen (Stunden zu Minuten konvertieren)
             document.getElementById('editTaskName').value = task.name;
-            document.getElementById('editTaskHours').value = task.hours;
+            document.getElementById('editTaskHours').value = Math.round(task.hours * 60);
             document.getElementById('editTaskWeightFactor').value = task.weight_factor || 1.00;
             document.getElementById('editTaskModal').dataset.taskId = taskId;
             showEditTaskModal();
@@ -1601,7 +1616,7 @@ async function saveEditedTask(event) {
     
     const taskId = document.getElementById('editTaskModal').dataset.taskId;
     const newName = document.getElementById('editTaskName').value.trim();
-    const newHours = parseFloat(document.getElementById('editTaskHours').value);
+    const newMinutes = parseInt(document.getElementById('editTaskHours').value);
     const newWeightFactor = parseFloat(document.getElementById('editTaskWeightFactor').value);
     
     if (!newName) {
@@ -1609,10 +1624,12 @@ async function saveEditedTask(event) {
         return;
     }
     
-    if (!newHours || newHours <= 0) {
-        showMessage('Bitte geben Sie eine gültige Stundenzahl ein', 'error');
+    if (!newMinutes || newMinutes <= 0) {
+        showMessage('Bitte geben Sie eine gültige Minutenzahl ein', 'error');
         return;
     }
+    
+    const newHours = newMinutes / 60; // Convert minutes to hours for backend
     
     if (!newWeightFactor || newWeightFactor <= 0 || newWeightFactor > 5) {
         showMessage('Bitte geben Sie einen gültigen Zeitgewichtungsfaktor ein (0.01 - 5.00)', 'error');
@@ -1966,11 +1983,12 @@ window.adjustUserBalance = function(userId, username, currentBalance) {
     // Update modal content
     document.getElementById('adjustBalanceUsername').textContent = username;
     const currentBalanceSpan = document.getElementById('adjustBalanceCurrentBalance');
-    currentBalanceSpan.textContent = `${currentBalance.toFixed(2)} Stunden`;
+    const currentBalanceInMinutes = Math.round(currentBalance * 60);
+    currentBalanceSpan.textContent = `${currentBalanceInMinutes} Minuten`;
     currentBalanceSpan.className = 'balance-display ' + (currentBalance >= 0 ? 'positive' : 'negative');
     
-    // Reset form
-    document.getElementById('newBalanceInput').value = currentBalance.toFixed(2);
+    // Reset form - show minutes
+    document.getElementById('newBalanceInput').value = currentBalanceInMinutes;
     document.getElementById('balancePreview').style.display = 'none';
     
     // Show modal
@@ -1991,24 +2009,24 @@ function updateBalancePreview() {
         return;
     }
     
-    const newBalance = parseFloat(newBalanceInput.value);
-    if (isNaN(newBalance)) {
+    const newBalanceMinutes = parseInt(newBalanceInput.value);
+    if (isNaN(newBalanceMinutes)) {
         preview.style.display = 'none';
         return;
     }
     
-    const oldBalance = adjustBalanceData.currentBalance;
-    const difference = newBalance - oldBalance;
+    const oldBalanceMinutes = Math.round(adjustBalanceData.currentBalance * 60);
+    const differenceMinutes = newBalanceMinutes - oldBalanceMinutes;
     
     // Update preview elements
-    document.getElementById('previewOldBalance').textContent = `${oldBalance.toFixed(2)}h`;
-    document.getElementById('previewOldBalance').className = 'balance-display ' + (oldBalance >= 0 ? 'positive' : 'negative');
+    document.getElementById('previewOldBalance').textContent = `${oldBalanceMinutes} min`;
+    document.getElementById('previewOldBalance').className = 'balance-display ' + (oldBalanceMinutes >= 0 ? 'positive' : 'negative');
     
-    document.getElementById('previewNewBalance').textContent = `${newBalance.toFixed(2)}h`;
-    document.getElementById('previewNewBalance').className = 'balance-display ' + (newBalance >= 0 ? 'positive' : 'negative');
+    document.getElementById('previewNewBalance').textContent = `${newBalanceMinutes} min`;
+    document.getElementById('previewNewBalance').className = 'balance-display ' + (newBalanceMinutes >= 0 ? 'positive' : 'negative');
     
-    document.getElementById('previewDifference').textContent = `${difference >= 0 ? '+' : ''}${difference.toFixed(2)}h`;
-    document.getElementById('previewDifference').className = 'balance-display ' + (difference >= 0 ? 'positive' : 'negative');
+    document.getElementById('previewDifference').textContent = `${differenceMinutes >= 0 ? '+' : ''}${differenceMinutes} min`;
+    document.getElementById('previewDifference').className = 'balance-display ' + (differenceMinutes >= 0 ? 'positive' : 'negative');
     
     preview.style.display = 'block';
 }
@@ -2016,21 +2034,28 @@ function updateBalancePreview() {
 async function submitBalanceAdjustment(event) {
     event.preventDefault();
     
-    const newBalance = parseFloat(document.getElementById('newBalanceInput').value);
+    const newBalanceMinutes = parseInt(document.getElementById('newBalanceInput').value);
     
-    if (isNaN(newBalance)) {
+    if (isNaN(newBalanceMinutes)) {
         showMessage('Bitte geben Sie eine gültige Zahl ein', 'error');
         return;
     }
     
     try {
+        // Konvertiere Minuten zu Stunden für das Backend
+        const balanceInHours = newBalanceMinutes / 60;
+        const reason = document.getElementById('balanceReasonInput').value;
+        
         const response = await fetch(`${API_BASE}/admin/users/${adjustBalanceData.userId}/balance`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify({ balance: newBalance })
+            body: JSON.stringify({ 
+                balance: balanceInHours,
+                reason: reason || undefined 
+            })
         });
         
         const data = await response.json();
@@ -2178,8 +2203,10 @@ async function loadCurrentBalance() {
         
         if (response.ok) {
             const data = await response.json();
-            document.getElementById('transferCurrentBalance').textContent = `${data.balance} Stunden`;
-            userTimeBalance = data.balance;
+            const balanceInMinutes = Math.round(data.balance * 60);
+            document.getElementById('transferCurrentBalance').textContent = `${balanceInMinutes} Minuten`;
+            document.getElementById('transferCurrentBalance').className = 'balance-display ' + (data.balance >= 0 ? 'positive' : 'negative');
+            userTimeBalance = data.balance; // Keep in hours for calculations
         } else {
             document.getElementById('transferCurrentBalance').textContent = 'Fehler beim Laden';
         }
@@ -2226,14 +2253,17 @@ function setupTransferPreview() {
     const userSelect = document.getElementById('transferToUserSelect');
     
     const updatePreview = () => {
-        const hours = parseFloat(hoursInput.value) || 0;
+        const minutes = parseInt(hoursInput.value) || 0;
         const selectedUser = userSelect.value;
         
-        if (hours > 0 && selectedUser) {
-            const newBalance = userTimeBalance - hours;
+        if (minutes > 0 && selectedUser) {
+            const hoursToTransfer = minutes / 60; // Convert minutes to hours for calculation
+            const newBalanceHours = userTimeBalance - hoursToTransfer;
+            const newBalanceMinutes = Math.round(newBalanceHours * 60);
             
-            document.getElementById('transferPreviewHours').textContent = `${hours} Stunden`;
-            document.getElementById('transferPreviewNewBalance').textContent = `${newBalance.toFixed(2)} Stunden`;
+            document.getElementById('transferPreviewHours').textContent = `${minutes} Minuten`;
+            document.getElementById('transferPreviewNewBalance').textContent = `${newBalanceMinutes} Minuten`;
+            document.getElementById('transferPreviewNewBalance').className = 'preview-value balance-display ' + (newBalanceHours >= 0 ? 'positive' : 'negative');
             document.getElementById('transferPreview').style.display = 'block';
         } else {
             document.getElementById('transferPreview').style.display = 'none';
@@ -2248,16 +2278,18 @@ async function submitHourTransfer(event) {
     event.preventDefault();
     
     const toUserId = document.getElementById('transferToUserSelect').value;
-    const hours = parseFloat(document.getElementById('transferHoursInput').value);
+    const minutes = parseInt(document.getElementById('transferHoursInput').value);
     const reason = document.getElementById('transferReasonInput').value;
     
-    if (!toUserId || !hours) {
-        showMessage('Bitte wählen Sie einen Empfänger und geben Sie die Stunden ein', 'error');
+    if (!toUserId || !minutes) {
+        showMessage('Bitte wählen Sie einen Empfänger und geben Sie die Minuten ein', 'error');
         return;
     }
     
+    const hours = minutes / 60; // Convert minutes to hours for backend
     if (hours > userTimeBalance) {
-        showMessage(`Nicht genügend Guthaben. Ihr Kontostand: ${userTimeBalance} Stunden`, 'error');
+        const balanceInMinutes = Math.round(userTimeBalance * 60);
+        showMessage(`Nicht genügend Guthaben. Ihr Kontostand: ${balanceInMinutes} Minuten`, 'error');
         return;
     }
     
@@ -2279,7 +2311,7 @@ async function submitHourTransfer(event) {
         
         if (response.ok) {
             const recipientName = document.getElementById('transferToUserSelect').selectedOptions[0].textContent;
-            showMessage(`Erfolgreich ${hours} Stunden an ${recipientName} verschenkt!`, 'success');
+            showMessage(`Erfolgreich ${minutes} Minuten an ${recipientName} verschenkt!`, 'success');
             closeTransferModal();
             
             // Balance und Transfer-Historie aktualisieren

@@ -55,7 +55,7 @@ class TimeAccountService {
         return true;
     }
     // Admin: User Balance Management
-    async adjustUserBalance(userId, newBalance) {
+    async adjustUserBalance(userId, newBalance, adminReason) {
         try {
             const connection = await (0, index_1.connectToDatabase)();
             // Prüfen ob Benutzer existiert
@@ -64,6 +64,9 @@ class TimeAccountService {
             if (users.length === 0) {
                 return false; // User not found
             }
+            // Aktuelle Balance abrufen
+            const currentBalance = await this.getUserBalance(userId);
+            const balanceDifference = newBalance - currentBalance;
             // Balance aktualisieren oder einfügen (UPSERT)
             await connection.execute(`
                 INSERT INTO user_time_balance (user_id, current_balance, last_updated)
@@ -72,7 +75,17 @@ class TimeAccountService {
                     current_balance = ?,
                     last_updated = CURRENT_TIMESTAMP
             `, [userId, newBalance, newBalance]);
-            console.log(`Admin adjusted balance for user ${userId} to ${newBalance} hours`);
+            // Zeiteintrag für Admin-Anpassung erstellen
+            if (balanceDifference !== 0) {
+                const description = adminReason ?
+                    `Admin-Anpassung: ${adminReason}` :
+                    `Admin-Anpassung der Balance (${balanceDifference >= 0 ? '+' : ''}${balanceDifference.toFixed(2)}h)`;
+                await connection.execute(`
+                    INSERT INTO time_entries (user_id, task_id, hours, entry_type, description, status, created_at)
+                    VALUES (?, NULL, ?, 'productive', ?, 'approved', CURRENT_TIMESTAMP)
+                `, [userId, balanceDifference, description]);
+            }
+            console.log(`Admin adjusted balance for user ${userId} to ${newBalance} hours (difference: ${balanceDifference}h)`);
             return true;
         }
         catch (error) {

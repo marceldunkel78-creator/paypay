@@ -223,7 +223,7 @@ export class AdminController {
     public async adjustUserBalance(req: Request, res: Response): Promise<void> {
         try {
             const { userId } = req.params;
-            const { balance } = req.body;
+            const { balance, reason } = req.body;
 
             if (!userId || balance === undefined) {
                 res.status(400).json({ error: 'User ID und Balance sind erforderlich' });
@@ -236,10 +236,10 @@ export class AdminController {
                 return;
             }
 
-            const success = await this.timeAccountService.adjustUserBalance(parseInt(userId), balanceNum);
+            const success = await this.timeAccountService.adjustUserBalance(parseInt(userId), balanceNum, reason);
             
             if (success) {
-                res.status(200).json({ message: 'Zeitkonto erfolgreich angepasst' });
+                res.status(200).json({ message: 'Zeitkonto erfolgreich angepasst und Zeiteintrag erstellt' });
             } else {
                 res.status(404).json({ error: 'Benutzer nicht gefunden' });
             }
