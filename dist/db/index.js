@@ -3,14 +3,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.initDatabase = exports.connectToDatabase = void 0;
+exports.initDatabase = exports.connectToDatabase = exports.getPool = void 0;
 const promise_1 = __importDefault(require("mysql2/promise"));
-let connection = null;
-const connectToDatabase = async () => {
-    if (connection) {
-        return connection;
-    }
-    try {
+let pool = null;
+// Get database pool
+const getPool = () => {
+    if (!pool) {
         // Parse DATABASE_URL from .env or use individual env vars
         const dbUrl = process.env.DATABASE_URL || '';
         let connectionConfig;
@@ -54,18 +52,23 @@ const connectToDatabase = async () => {
                 database: process.env.DB_NAME || 'time_account_db',
             };
         }
-        console.log('Connecting to database with config:', {
+        console.log('Creating database pool with config:', {
             ...connectionConfig,
             password: connectionConfig.password ? '[HIDDEN]' : '[EMPTY]'
         });
-        connection = await promise_1.default.createConnection(connectionConfig);
-        console.log('Database connection established');
-        return connection;
+        // Create connection pool
+        pool = promise_1.default.createPool({
+            ...connectionConfig,
+            connectionLimit: 10,
+            queueLimit: 0
+        });
+        console.log('Database pool created successfully');
     }
-    catch (error) {
-        console.error('Database connection error:', error);
-        throw error;
-    }
+    return pool;
+};
+exports.getPool = getPool;
+const connectToDatabase = async () => {
+    return (0, exports.getPool)();
 };
 exports.connectToDatabase = connectToDatabase;
 const initDatabase = async () => {

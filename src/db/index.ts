@@ -1,14 +1,11 @@
 import mysql from 'mysql2/promise';
 import config from '../config/default';
 
-let connection: mysql.Connection | null = null;
+let pool: mysql.Pool | null = null;
 
-export const connectToDatabase = async (): Promise<mysql.Connection> => {
-    if (connection) {
-        return connection;
-    }
-
-    try {
+// Get database pool
+export const getPool = (): mysql.Pool => {
+    if (!pool) {
         // Parse DATABASE_URL from .env or use individual env vars
         const dbUrl = process.env.DATABASE_URL || '';
         
@@ -52,19 +49,26 @@ export const connectToDatabase = async (): Promise<mysql.Connection> => {
             };
         }
 
-        console.log('Connecting to database with config:', {
+        console.log('Creating database pool with config:', {
             ...connectionConfig,
             password: connectionConfig.password ? '[HIDDEN]' : '[EMPTY]'
         });
         
-        connection = await mysql.createConnection(connectionConfig);
+        // Create connection pool
+        pool = mysql.createPool({
+            ...connectionConfig,
+            connectionLimit: 10,
+            queueLimit: 0
+        });
 
-        console.log('Database connection established');
-        return connection;
-    } catch (error) {
-        console.error('Database connection error:', error);
-        throw error;
+        console.log('Database pool created successfully');
     }
+    
+    return pool;
+};
+
+export const connectToDatabase = async (): Promise<mysql.Pool> => {
+    return getPool();
 };
 
 export const initDatabase = async (): Promise<void> => {
